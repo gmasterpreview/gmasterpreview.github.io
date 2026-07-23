@@ -415,6 +415,12 @@
               <input type="checkbox" id="hide-cards-toggle-input" onchange="generateResultImage()" style="width: 18px; height: 18px; cursor: pointer;" />
               <label for="hide-cards-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.85rem; color: #38bdf8; font-weight: 600;">Exibir apenas Detalhamento da Análise (ocultar quadros de valores)</label>
             </div>
+
+            <!-- Logo Toggle -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="logo-toggle-input" checked onchange="generateResultImage()" style="width: 18px; height: 18px; cursor: pointer;" />
+              <label for="logo-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.85rem; color: var(--text-secondary);">Exibir logo da Gmaster no cabeçalho azul</label>
+            </div>
           </div>
         </details>
 
@@ -438,7 +444,7 @@
 
             <div>
               <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px; font-weight: bold;">CNPJ (OPCIONAL)</label>
-              <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+              <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="this.value = this.value.replace(/[^\d.\/\-]/g, ''); generateResultImage();" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
             </div>
           </div>
 
@@ -660,7 +666,7 @@
                 ${c.label}
               </label>
             </div>
-            <input type="text" value="${formatMoneyRaw(val)}" oninput="updateOverrideValue('${c.key}', this.value)" style="width: 100%; padding: 4px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; ${isChecked ? '' : 'background: #f1f5f9; color: #94a3b8;'}" ${isChecked ? '' : 'disabled'} />
+            <input type="text" value="${formatMoneyRaw(val)}" oninput="updateOverrideValue('${c.key}', this.value)" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; ${isChecked ? 'background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;' : 'background-color: #f1f5f9 !important; color: #94a3b8 !important;'}" ${isChecked ? '' : 'disabled'} />
           </div>
         `;
       });
@@ -1467,7 +1473,7 @@ function formatCurrency(val) {
 
     // Synthesize Card Image + Text onto Canvas
     function generateResultImage() {
-      const partner = partnerInput.value.trim().toUpperCase() || 'GMASTER GESTAO EMPRESARIAL LTDA';
+      const partner = partnerInput.value.trim().toUpperCase();
       const rawText = textInput.value.trim();
 
       if (!rawText) return;
@@ -1664,39 +1670,44 @@ function formatCurrency(val) {
 
           ctx.font = 'bold 16px "Plus Jakarta Sans"';
           const metaText = cnpj ? `Empresa: ${empresa} | CNPJ: ${cnpj}` : `Empresa: ${empresa}`;
-          ctx.fillText(metaText, 80, 98);
+          ctx.fillText(metaText, 80, partner ? 95 : 108);
           
-          ctx.fillStyle = '#cbd5e1'; // elegant light gray-blue
-          ctx.fillText('Parceiro: ' + partner, 80, 124);
-
-          // 3. Draw white logo inside banner on the right
-          ctx.save();
-          if (type === 'juridico' && logoAmandaArruda.complete && logoAmandaArruda.naturalWidth > 0) {
-            ctx.filter = 'brightness(0) invert(1)';
-            const aaAspect = logoAmandaArruda.naturalWidth / logoAmandaArruda.naturalHeight;
-            const aaH = 100;
-            const aaW = aaH * aaAspect;
-            const aaX = canvasWidth - 80 - aaW;
-            ctx.drawImage(logoAmandaArruda, aaX, 25, aaW, aaH);
-          } else if (logoHorizontal.complete && logoHorizontal.naturalWidth > 0) {
-            ctx.filter = 'brightness(0) invert(1)';
-            const logoW = 255;
-            const logoH = 103;
-            ctx.drawImage(logoHorizontal, canvasWidth - 80 - logoW, 23, logoW, logoH);
-          } else {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 36px "Plus Jakarta Sans"';
-            const gmText = 'Gmaster';
-            const gmW = ctx.measureText(gmText).width;
-            ctx.fillText(gmText, canvasWidth - 80 - gmW, 75);
-
-            ctx.fillStyle = '#cbd5e1';
-            ctx.font = '18px "Plus Jakarta Sans"';
-            const subText = 'eficiência tributária';
-            const subW = ctx.measureText(subText).width;
-            ctx.fillText(subText, canvasWidth - 80 - subW, 108);
+          if (partner) {
+            ctx.fillStyle = '#cbd5e1'; // elegant light gray-blue
+            ctx.fillText('Parceiro: ' + partner, 80, 124);
           }
-          ctx.restore();
+
+          // 3. Draw white logo inside banner on the right if enabled
+          const showLogo = document.getElementById('logo-toggle-input') ? document.getElementById('logo-toggle-input').checked : true;
+          if (showLogo) {
+            ctx.save();
+            if (type === 'juridico' && logoAmandaArruda.complete && logoAmandaArruda.naturalWidth > 0) {
+              ctx.filter = 'brightness(0) invert(1)';
+              const aaAspect = logoAmandaArruda.naturalWidth / logoAmandaArruda.naturalHeight;
+              const aaH = 100;
+              const aaW = aaH * aaAspect;
+              const aaX = canvasWidth - 80 - aaW;
+              ctx.drawImage(logoAmandaArruda, aaX, 25, aaW, aaH);
+            } else if (logoHorizontal.complete && logoHorizontal.naturalWidth > 0) {
+              ctx.filter = 'brightness(0) invert(1)';
+              const logoW = 255;
+              const logoH = 103;
+              ctx.drawImage(logoHorizontal, canvasWidth - 80 - logoW, 23, logoW, logoH);
+            } else {
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 36px "Plus Jakarta Sans"';
+              const gmText = 'Gmaster';
+              const gmW = ctx.measureText(gmText).width;
+              ctx.fillText(gmText, canvasWidth - 80 - gmW, 75);
+
+              ctx.fillStyle = '#cbd5e1';
+              ctx.font = '18px "Plus Jakarta Sans"';
+              const subText = 'eficiência tributária';
+              const subW = ctx.measureText(subText).width;
+              ctx.fillText(subText, canvasWidth - 80 - subW, 108);
+            }
+            ctx.restore();
+          }
         }
 
         // Draw the pasted printout image directly below the metadata (or vector layout)
