@@ -454,6 +454,11 @@
                 <label for="hide-cards-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.82rem; color: #38bdf8; font-weight: 600;">Exibir apenas Detalhamento da Análise (ocultar quadros)</label>
               </div>
 
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="show-section-header-input" checked onchange="generateResultImage()" style="width: 16px; height: 16px; cursor: pointer;" />
+                <label for="show-section-header-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.82rem; color: #cbd5e1;">Exibir título "DETALHAMENTO DA ANÁLISE" no texto</label>
+              </div>
+
               <!-- Collapsible Override Values Section inside Group 3 -->
               <div id="vector-override-container" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
                 <div style="font-size: 0.75rem; font-weight: bold; color: #cbd5e1; margin-bottom: 6px;">Valores dos Cards (Extraídos)</div>
@@ -1479,8 +1484,13 @@ function formatCurrency(val) {
 
     // Synthesize Card Image + Text onto Canvas
     function generateResultImage() {
-      const partner = partnerInput.value.trim().toUpperCase();
-      const rawText = textInput.value.trim();
+      window.generateResultImage = generateResultImage;
+      window.handleAnalystTextInput = generateResultImage;
+
+      const partnerInput = document.getElementById('partner-input');
+      const textInput = document.getElementById('text-input');
+      const partner = partnerInput ? partnerInput.value.trim().toUpperCase() : '';
+      const rawText = textInput ? textInput.value.trim() : '';
 
       if (!rawText) return;
 
@@ -1528,22 +1538,13 @@ function formatCurrency(val) {
           }
         }
 
-        // Ensure there is always a header for the analyst text (only checks the first non-empty line to avoid matches in the middle of sentences)
-        const bodyLinesForHeader = cleanedBodyText.split('\n').map(l => l.trim()).filter(Boolean);
-        const firstLineForHeader = bodyLinesForHeader[0] ? bodyLinesForHeader[0].toLowerCase() : '';
-        
-        const hasHeaderAlready = 
-          firstLineForHeader.startsWith('detalhamento da análise') || 
-          firstLineForHeader.startsWith('detalhamento da analise') || 
-          firstLineForHeader.startsWith('detalhes da análise') || 
-          firstLineForHeader.startsWith('detalhes da analise') || 
-          firstLineForHeader.startsWith('oportunidades identificadas') || 
-          firstLineForHeader.startsWith('resultados - verbas') || 
-          firstLineForHeader.startsWith('resultados') ||
-          (bodyLinesForHeader[0] && bodyLinesForHeader[0] === bodyLinesForHeader[0].toUpperCase() && bodyLinesForHeader[0].length > 4 && !bodyLinesForHeader[0].startsWith('•') && !bodyLinesForHeader[0].startsWith('-') && !bodyLinesForHeader[0].startsWith('*'));
-                                 
-        if (!hasHeaderAlready) {
-          cleanedBodyText = "DETALHAMENTO DA ANÁLISE\n\n" + cleanedBodyText;
+        const showSectionHeader = document.getElementById('show-section-header-input') ? document.getElementById('show-section-header-input').checked : true;
+
+        // Clean up existing section header from text if user chose to hide it or to prevent duplication
+        let textBody = cleanedBodyText.replace(/^(detalhamento da an[áa]lise|detalhes da an[áa]lise)\s*\n*/i, '').trim();
+
+        if (showSectionHeader) {
+          textBody = "DETALHAMENTO DA ANÁLISE\n\n" + textBody;
         }
 
         // Default Header fallback if we didn't extract any from text
@@ -1556,12 +1557,17 @@ function formatCurrency(val) {
           else detectedType = 'fiscal';
         }
 
-        const overrideEmpresa = document.getElementById('override-empresa-input') ? document.getElementById('override-empresa-input').value.trim() : '';
+        const overrideEmpresaInput = document.getElementById('override-empresa-input');
+        const overrideEmpresa = overrideEmpresaInput ? overrideEmpresaInput.value.trim() : '';
         const overrideCnpj = document.getElementById('override-cnpj-input') ? document.getElementById('override-cnpj-input').value.trim() : '';
         const overrideTitle = document.getElementById('override-title-input') ? document.getElementById('override-title-input').value.trim() : '';
 
         const type = (parsedCardData && parsedCardData.type) || detectedType || 'fiscal';
-        const empresa = overrideEmpresa || extractedEmpresa || (parsedCardData && parsedCardData.empresa) || 'NÃO IDENTIFICADO';
+        
+        // If user cleared the empresa input explicitly, respect empty string instead of forced fallback
+        const empresa = overrideEmpresaInput 
+          ? overrideEmpresa 
+          : (extractedEmpresa || (parsedCardData && parsedCardData.empresa) || '');
         const cnpj = overrideCnpj || (parsedCardData && parsedCardData.cnpj) || '';
 
         const hideCards = document.getElementById('hide-cards-toggle-input') ? document.getElementById('hide-cards-toggle-input').checked : false;
@@ -1591,62 +1597,70 @@ function formatCurrency(val) {
           : (img ? (sourceHeight * imgScale) : 0));
         let imgHeight = imgDrawHeight + imgTopPadding;
 
-        // Smart parse paragraphs
-        const cleanParagraphs = smartJoinParagraphs(cleanedBodyText);
-        const fullFormattedText = cleanParagraphs.join('\n\n');
-
-        // Word-wrap the text lines for Canvas rendering
+        // Word-wrap the text lines for Canvas rendering while strictly preserving line breaks
+        const bodyTextLines = textBody.replace(/\r\n/g, '\n').split('\n');
         const wrappedLines = [];
-        const finalParagraphs = fullFormattedText.split('\n\n');
 
-        finalParagraphs.forEach(paragraph => {
-          if (paragraph.trim() === '') {
+        bodyTextLines.forEach(rawLine => {
+          const trimmed = rawLine.trim();
+          if (trimmed === '') {
             wrappedLines.push({ text: '', type: 'empty' });
             return;
           }
 
-          const isBullet = paragraph.startsWith('-') || paragraph.startsWith('•') || paragraph.startsWith('*');
-          const bulletPrefix = isBullet ? paragraph.match(/^([•\-\*]\s*)/)[0] : '';
-          const cleanText = isBullet ? paragraph.substring(bulletPrefix.length) : paragraph;
+          const isMainHeader = trimmed.toUpperCase() === 'DETALHAMENTO DA ANÁLISE' ||
+                               trimmed.toUpperCase() === 'DETALHES DA ANÁLISE' ||
+                               trimmed.toUpperCase() === 'OPORTUNIDADES IDENTIFICADAS' ||
+                               trimmed.toUpperCase() === 'RESULTADOS - VERBAS' ||
+                               trimmed.toUpperCase() === 'RESULTADOS';
+
+          const isCompanyHeader = !isMainHeader && (
+            (trimmed === trimmed.toUpperCase() && trimmed.length > 4 && !trimmed.startsWith('•') && !trimmed.startsWith('-') && !trimmed.startsWith('*')) ||
+            /\b(LTDA|S\/A|S\.A\.|ME|EPP|EIRELI)\b/i.test(trimmed)
+          );
+
+          if (isMainHeader) {
+            wrappedLines.push({ text: trimmed, isLast: true, type: 'main_header' });
+            return;
+          }
+
+          if (isCompanyHeader) {
+            wrappedLines.push({ text: trimmed, isLast: true, type: 'company_header' });
+            return;
+          }
+
+          const isBullet = trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*');
+          const bulletPrefix = isBullet ? trimmed.match(/^([•\-\*]\s*)/)[0] : '';
+          const cleanText = isBullet ? trimmed.substring(bulletPrefix.length) : trimmed;
 
           const words = cleanText.split(' ');
           let currentLine = bulletPrefix;
-          const paragraphLines = [];
 
           for (let i = 0; i < words.length; i++) {
             const testLine = currentLine + (currentLine && currentLine !== bulletPrefix ? ' ' : '') + words[i];
             const testWidth = ctx.measureText(testLine.replace(/\*/g, '')).width;
 
             if (testWidth > maxTextWidth && i > 0) {
-              paragraphLines.push({ text: currentLine, isLast: false, isBullet: isBullet });
+              wrappedLines.push({ text: currentLine, isLast: false, isBullet: isBullet });
               currentLine = isBullet ? '  ' + words[i] : words[i];
             } else {
               currentLine = testLine;
             }
           }
-          paragraphLines.push({ text: currentLine, isLast: true, isBullet: isBullet });
-          wrappedLines.push(...paragraphLines);
-          wrappedLines.push({ text: '', type: 'empty' }); // Spacing between paragraphs
+          wrappedLines.push({ text: currentLine, isLast: true, isBullet: isBullet });
         });
-
-        // Remove trailing empty line
-        if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1].type === 'empty') {
-          wrappedLines.pop();
-        }
 
         // Compute Canvas Height dynamically
         let totalTextHeight = 120; // top & bottom margin
         wrappedLines.forEach(lineObj => {
           if (lineObj.type === 'empty') {
             totalTextHeight += 16;
+          } else if (lineObj.type === 'main_header') {
+            totalTextHeight += 42;
+          } else if (lineObj.type === 'company_header') {
+            totalTextHeight += 38;
           } else {
-            // Give slightly more height if line is a header
-            const isHeader = lineObj.text.trim().toUpperCase() === 'DETALHAMENTO DA ANÁLISE' ||
-                             lineObj.text.trim().toUpperCase() === 'DETALHES DA ANÁLISE' ||
-                             lineObj.text.trim().toUpperCase() === 'OPORTUNIDADES IDENTIFICADAS' ||
-                             lineObj.text.trim().toUpperCase() === 'RESULTADOS - VERBAS' ||
-                             (lineObj.text.trim() === lineObj.text.trim().toUpperCase() && lineObj.text.trim().length > 4 && !lineObj.text.trim().startsWith('EMPRESA:') && !lineObj.text.trim().startsWith('PARCEIRO:') && !lineObj.text.trim().startsWith('CNPJ:') && !lineObj.text.trim().startsWith('•') && !lineObj.text.trim().startsWith('-') && !lineObj.text.trim().startsWith('*'));
-            totalTextHeight += isHeader ? 42 : lineHeight;
+            totalTextHeight += lineHeight;
           }
         });
 
@@ -1674,13 +1688,24 @@ function formatCurrency(val) {
           ctx.font = 'bold 30px "Plus Jakarta Sans"';
           ctx.fillText(titleText, 80, 58);
 
-          ctx.font = 'bold 16px "Plus Jakarta Sans"';
-          const metaText = cnpj ? `Empresa: ${empresa} | CNPJ: ${cnpj}` : `Empresa: ${empresa}`;
-          ctx.fillText(metaText, 80, partner ? 95 : 108);
+          let metaText = '';
+          if (empresa && cnpj) {
+            metaText = `Empresa: ${empresa} | CNPJ: ${cnpj}`;
+          } else if (empresa) {
+            metaText = `Empresa: ${empresa}`;
+          } else if (cnpj) {
+            metaText = `CNPJ: ${cnpj}`;
+          }
+
+          if (metaText) {
+            ctx.font = 'bold 16px "Plus Jakarta Sans"';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(metaText, 80, partner ? 95 : 108);
+          }
           
           if (partner) {
             ctx.fillStyle = '#cbd5e1'; // elegant light gray-blue
-            ctx.fillText('Parceiro: ' + partner, 80, 124);
+            ctx.fillText('Parceiro: ' + partner, 80, metaText ? 124 : 108);
           }
 
           // 3. Draw white logo inside banner on the right if enabled
@@ -1742,18 +1767,16 @@ function formatCurrency(val) {
             return;
           }
 
-          // Check if line is a header to apply special style dynamically
-          const isHeader = lineObj.text.trim().toUpperCase() === 'DETALHAMENTO DA ANÁLISE' ||
-                           lineObj.text.trim().toUpperCase() === 'DETALHES DA ANÁLISE' ||
-                           lineObj.text.trim().toUpperCase() === 'OPORTUNIDADES IDENTIFICADAS' ||
-                           lineObj.text.trim().toUpperCase() === 'RESULTADOS - VERBAS' ||
-                           (lineObj.text.trim() === lineObj.text.trim().toUpperCase() && lineObj.text.trim().length > 4 && !lineObj.text.trim().startsWith('EMPRESA:') && !lineObj.text.trim().startsWith('PARCEIRO:') && !lineObj.text.trim().startsWith('CNPJ:') && !lineObj.text.trim().startsWith('•') && !lineObj.text.trim().startsWith('-') && !lineObj.text.trim().startsWith('*'));
-          
-          if (isHeader) {
+          if (lineObj.type === 'main_header') {
             ctx.fillStyle = '#1b4372';
             ctx.font = 'bold 24px "Plus Jakarta Sans"';
             ctx.fillText(lineObj.text.trim(), margin, currentY);
             currentY += 42;
+          } else if (lineObj.type === 'company_header') {
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 22px "Plus Jakarta Sans"';
+            ctx.fillText(lineObj.text.trim(), margin, currentY);
+            currentY += 38;
           } else {
             drawTextLine(ctx, lineObj.text, margin, currentY, maxTextWidth, lineObj.isLast);
             currentY += lineHeight;
@@ -1783,6 +1806,7 @@ function formatCurrency(val) {
         executeRenderCanvas(null);
       }
     }
+    window.generateResultImage = generateResultImage;
 
     // Comprehensive Text Line drawer with word justification support
     function drawTextLine(ctx, lineText, startX, Y, maxTextWidth, isLast) {
@@ -1868,26 +1892,40 @@ function formatCurrency(val) {
       }
     }
 
-    // Markdown bold parser
+    // Markdown & Colon Label Bold Parser
     function parseBoldText(text) {
       const parts = [];
-      const regex = /\*(.*?)\*/g;
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push({ text: text.substring(lastIndex, match.index), isBold: false });
+
+      // Check if text contains markdown bold syntax like **text** or *text*
+      const markdownRegex = /(\*\*|\*)(.*?)\1/g;
+      if (markdownRegex.test(text)) {
+        markdownRegex.lastIndex = 0;
+        let lastIdx = 0;
+        let m;
+        while ((m = markdownRegex.exec(text)) !== null) {
+          if (m.index > lastIdx) {
+            parts.push({ text: text.substring(lastIdx, m.index), isBold: false });
+          }
+          parts.push({ text: m[2], isBold: true });
+          lastIdx = markdownRegex.lastIndex;
         }
-        parts.push({ text: match[1], isBold: true });
-        lastIndex = regex.lastIndex;
+        if (lastIdx < text.length) {
+          parts.push({ text: text.substring(lastIdx), isBold: false });
+        }
+        return parts;
       }
-      
-      if (lastIndex < text.length) {
-        parts.push({ text: text.substring(lastIndex), isBold: false });
+
+      // Auto-bold label prefix before colon (e.g. "Analise previdenciária: Stand-by.")
+      const colonMatch = text.match(/^([A-Za-z0-9à-úÀ-Ú\s\-_•\*\.]+\s*:)(.*)/);
+      if (colonMatch && !text.startsWith('http')) {
+        parts.push({ text: colonMatch[1], isBold: true });
+        if (colonMatch[2]) {
+          parts.push({ text: colonMatch[2], isBold: false });
+        }
+        return parts;
       }
-      
-      return parts.length > 0 ? parts : [{ text: text, isBold: false }];
+
+      return [{ text: text, isBold: false }];
     }
 
     // Copy combined image to system clipboard
@@ -2220,6 +2258,7 @@ function formatCurrency(val) {
       ctx.quadraticCurveTo(x, y, x + radius.tl, y);
       ctx.closePath();
     }
+    window.generateResultImage = generateResultImage;
   </script>
 
   <!-- Fullscreen Modal Viewer -->
