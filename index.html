@@ -960,27 +960,48 @@
       }
       */
 
-      const values = { prov: 0, poss: 0, jud: 0, classif: 0, rem: 0, dem: 0, deb: 0, desc: 0, ent: 0, prest: 0, rating: 'C' };
-      ocrParsedBoxValues = false; // reset
-
-      // 1. Try Gmaster Multi-Value Card Row extraction (for Fiscal/Prev templates)
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       let extractedAny = false;
 
+      // Extract Total Value from image text first to validate multi-value card row
+      let totalVal = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].toLowerCase();
+        if (line.includes('total') || line.includes('oportunidade') || line.includes('oportunidades') || line.includes('valor')) {
+          const searchArea = [line, i < lines.length - 1 ? lines[i+1].toLowerCase() : ''].join(' ');
+          const m = searchArea.match(/(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/i);
+          if (m) {
+            const tv = parseRobustFloat(m[1]);
+            if (!isNaN(tv) && tv > 0) { totalVal = tv; break; }
+          }
+        }
+      }
+
+      const values = { prov: 0, poss: 0, jud: 0, classif: 0, rem: 0, dem: 0, deb: 0, desc: 0, ent: 0, prest: 0, rating: 'C' };
+      ocrParsedBoxValues = false;
+
+      // 1. Try Gmaster Multi-Value Card Row extraction (only if sum matches totalVal)
       if (type === 'fiscal' || type === 'prev') {
         let cardLineValues = null;
         for (const line of lines) {
+          const lineLower = line.toLowerCase();
+          if (!lineLower.includes('r$') && !lineLower.includes('prov') && !lineLower.includes('poss') && !lineLower.includes('rem') && !lineLower.includes('jud') && !lineLower.includes('dem') && !lineLower.includes('classif')) {
+            continue;
+          }
           const moneyRegexGlobal = /(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/gi;
           const lineMoneyValues = [];
           let mMatch;
           while ((mMatch = moneyRegexGlobal.exec(line)) !== null) {
             const val = parseRobustFloat(mMatch[1]);
-            if (!isNaN(val)) lineMoneyValues.push(val);
+            if (!isNaN(val) && val > 0) lineMoneyValues.push(val);
           }
-          // The card row always has 3 or 4 values (PROVÁVEL, POSSÍVEL, JUDICIAL/REMOTO, CLASSIFICAR/DEMANDA)
           if (lineMoneyValues.length >= 3 && lineMoneyValues.length <= 4) {
-            cardLineValues = lineMoneyValues;
-            break;
+            const lineSum = lineMoneyValues.reduce((a, b) => a + b, 0);
+            // Only accept card line if sum matches totalVal or if totalVal is not found
+            if (!totalVal || Math.abs(lineSum - totalVal) < 5.0) {
+              cardLineValues = lineMoneyValues;
+              break;
+            }
           }
         }
 
@@ -1001,15 +1022,18 @@
         }
       }
 
-      // 2. Try Label-Based Extraction (most robust) if Gmaster card row was not parsed
+      // 2. Try Label-Based Extraction (most robust) if Gmaster card row was not parsed or was incomplete
       if (!ocrParsedBoxValues) {
+        lines.forEach((line, i) => {
+          const moneyRegexGlobal = /(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/gi;
+          const lineMoneyMatches = [];
+          let mMatch;
+          while ((mMatch = moneyRegexGlobal.exec(line)) !== null) {
+            const val = parseRobustFloat(mMatch[1]);
+            if (!isNaN(val) && val > 0) lineMoneyMatches.push(val);
+          }
 
-      lines.forEach((line, i) => {
-        const valMatch = line.match(/(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/i);
-        if (valMatch) {
-          const val = parseRobustFloat(valMatch[1]);
-          if (!isNaN(val)) {
-            // Combine previous line, current line and next line to resolve category label context
+          if (lineMoneyMatches.length > 0) {
             const context = [
               i > 0 ? lines[i - 1] : '',
               line,
@@ -1018,173 +1042,105 @@
 
             if (type === 'juridico') {
               if (context.includes('sem descontos') || context.includes('sem')) {
-                values.deb = val;
+                values.deb = lineMoneyMatches[0];
                 extractedAny = true;
               } else if ((context.includes('descontos') || context.includes('desconto')) && !context.includes('sem')) {
-                values.desc = val;
+                values.desc = lineMoneyMatches[0];
                 extractedAny = true;
               } else if (context.includes('entrada') || context.includes('enlrada') || context.includes('1-12') || context.includes('1-')) {
-                values.ent = val;
+                values.ent = lineMoneyMatches[0];
                 extractedAny = true;
               } else if (context.includes('presta') || context.includes('prest') || context.includes('13-') || context.includes('145')) {
-                values.prest = val;
+                values.prest = lineMoneyMatches[0];
                 extractedAny = true;
               }
             } else {
-              // Fiscal or Previdenciário
-              if (context.includes('provável') || context.includes('provavel') || context.includes('prov')) {
-                values.prov = val;
-                extractedAny = true;
-              } else if (context.includes('possível') || context.includes('possivel') || context.includes('poss') || context.includes('insumos') || context.includes('crédito') || context.includes('credito')) {
-                values.poss = val;
-                extractedAny = true;
-              } else if (context.includes('remoto') || context.includes('rem') || context.includes('demanda') || context.includes('dem')) {
-                values.rem = val;
-                extractedAny = true;
-              } else if (context.includes('judicial') || context.includes('jud')) {
-                values.jud = val;
-                extractedAny = true;
-              } else if (context.includes('classificar') || context.includes('classif')) {
-                values.classif = val;
-                extractedAny = true;
-              } else if (context.includes('demanda') || context.includes('dem')) {
-                values.dem = val;
-                extractedAny = true;
+              if (lineMoneyMatches.length === 1) {
+                const val = lineMoneyMatches[0];
+                if (context.includes('provável') || context.includes('provavel')) {
+                  values.prov = val;
+                  extractedAny = true;
+                } else if (context.includes('possível') || context.includes('possivel')) {
+                  values.poss = val;
+                  extractedAny = true;
+                } else if (context.includes('remoto')) {
+                  values.rem = val;
+                  extractedAny = true;
+                } else if (context.includes('judicial')) {
+                  values.jud = val;
+                  extractedAny = true;
+                } else if (context.includes('classificar') || context.includes('classif')) {
+                  values.classif = val;
+                  extractedAny = true;
+                } else if (context.includes('demanda')) {
+                  values.dem = val;
+                  extractedAny = true;
+                }
+              } else {
+                // Multiple values on same line (e.g. Card Row)
+                if (context.includes('provável') || context.includes('provavel') || context.includes('possível') || context.includes('possivel')) {
+                  values.prov = lineMoneyMatches[0] || 0;
+                  values.poss = lineMoneyMatches[1] || 0;
+                  if (type === 'fiscal') {
+                    values.jud = lineMoneyMatches[2] || 0;
+                    if (lineMoneyMatches.length > 3) values.classif = lineMoneyMatches[3];
+                  } else if (type === 'prev') {
+                    values.rem = lineMoneyMatches[2] || 0;
+                    if (lineMoneyMatches.length > 3) values.dem = lineMoneyMatches[3];
+                  }
+                  extractedAny = true;
+                }
               }
             }
           }
-        }
-      });
-
-      // Extract Rating for Jurídico
-      if (type === 'juridico') {
-        const ratingMatch = text.match(/rating\s*([a-d])/i);
-        values.rating = ratingMatch ? ratingMatch[1].toUpperCase() : 'C';
-      }
-
-      // 2. Fallback to Index-Based Extraction if label extraction failed
-      if (!extractedAny) {
-        const moneyValues = [];
-        const moneyRegex = /(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/gi;
-        let mMatch;
-        while ((mMatch = moneyRegex.exec(text)) !== null) {
-          moneyValues.push(parseRobustFloat(mMatch[1]));
-        }
-        console.log("Index fallback money values:", moneyValues);
-
-        if (type === 'fiscal') {
-          if (moneyValues.length > 1) values.prov = moneyValues[1];
-          if (moneyValues.length > 2) values.poss = moneyValues[2];
-          if (moneyValues.length > 3) values.jud = moneyValues[3];
-          if (moneyValues.length > 4) values.classif = moneyValues[4];
-        } else if (type === 'prev') {
-          if (moneyValues.length > 1) values.prov = moneyValues[1];
-          if (moneyValues.length > 2) values.poss = moneyValues[2];
-          if (moneyValues.length > 3) values.rem = moneyValues[3];
-          if (moneyValues.length > 4) values.dem = moneyValues[4];
-        } else if (type === 'juridico') {
-          if (moneyValues.length > 0) values.deb = moneyValues[0];
-          if (moneyValues.length > 1) values.desc = moneyValues[1];
-          if (moneyValues.length > 3) values.ent = moneyValues[3];
-          if (moneyValues.length > 4) values.prest = moneyValues[4];
-        }
-      }
-      } // End of if (!ocrParsedBoxValues)
-
-      
-      // 3. Backup for Jurídico table by ordered money values (guarantees prestacao never stays 0)
-      if (type === 'juridico') {
-        const moneyValues = [];
-        lines.forEach(line => {
-          const valMatch = line.match(/(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/i);
-          if (valMatch) {
-            const val = parseRobustFloat(valMatch[1]);
-            if (!isNaN(val)) moneyValues.push(val);
-          }
         });
-        console.log("Juridico ordered money values backup:", moneyValues);
-        if (moneyValues.length >= 5) {
-          if (values.deb === 0) values.deb = moneyValues[0];
-          if (values.desc === 0) values.desc = moneyValues[1];
-          if (values.ent === 0) values.ent = moneyValues[3];
-          if (values.prest === 0) values.prest = moneyValues[4];
-        } else if (moneyValues.length === 4) {
-          if (values.deb === 0) values.deb = moneyValues[0];
-          if (values.desc === 0) values.desc = moneyValues[1];
-          
-          // Use a relative threshold (10% of debt) to differentiate subtotal from Entrada
-          const threshold = moneyValues[0] * 0.1;
-          const isIndex2Saldo = moneyValues[2] > threshold;
-          
-          if (isIndex2Saldo) {
-            if (values.ent === 0) values.ent = moneyValues[3];
-            // prest remains 0 (since the 5th value is missing)
-          } else {
-            // If Saldo row was missed by OCR, then moneyValues is: deb, desc, ent, prest
-            if (values.ent === 0) values.ent = moneyValues[2];
-            if (values.prest === 0) values.prest = moneyValues[3];
-          }
+
+        // Extract Rating for Jurídico
+        if (type === 'juridico') {
+          const ratingMatch = text.match(/rating\s*([a-d])/i);
+          values.rating = ratingMatch ? ratingMatch[1].toUpperCase() : 'C';
         }
       }
 
-      // 4. Self-healing algorithm to correct OCR digit misreads (e.g. 8 read as 6)
+      // 3. Self-healing algorithm to correct OCR digit misreads and assign missing diff to cards
       if (type === 'fiscal' || type === 'prev') {
         const sumCards = (values.prov || 0) + (values.poss || 0) + (values.rem || 0) + (values.jud || 0) + (values.classif || 0) + (values.dem || 0);
-        
-        // Find the read total value from the text (robust matching)
-        let totalVal = 0;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].toLowerCase();
-          if (line.includes('total') || line.includes('oportunidade') || line.includes('oportunidades') || line.includes('valor') || line.includes('tcta') || line.includes('tiztal') || line.includes('ucrtarvades') || line.includes('val')) {
-            const searchArea = [line, i < lines.length - 1 ? lines[i+1].toLowerCase() : ''].join(' ');
-            const m = searchArea.match(/(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/i);
-            if (m) {
-              totalVal = parseRobustFloat(m[1]);
-              if (!isNaN(totalVal) && totalVal > 0) break;
-            }
-          }
-        }
-        // Fallback: use the very first money value in the text
-        if (!totalVal || isNaN(totalVal)) {
-          const firstMoneyMatch = text.match(/(?:R\$|RS|R|S)?\s*([\d]+(?:[\d.,]+)?[,.]\d{2})/i);
-          if (firstMoneyMatch) {
-            totalVal = parseRobustFloat(firstMoneyMatch[1]);
-          }
-        }
 
-        if (!isNaN(totalVal) && totalVal > 0) {
+        if (totalVal > 0 && Math.abs(totalVal - sumCards) > 0.01) {
           const diff = totalVal - sumCards;
-          if (Math.abs(diff) > 0.01) {
-            console.log(`OCR sum mismatch: total=${totalVal}, sum=${sumCards}, diff=${diff}`);
-              const cardsToCheck = ['prov', 'poss', 'rem', 'jud', 'classif', 'dem'];
-              for (const key of cardsToCheck) {
-                if (values[key] > 0) {
-                  const originalVal = values[key];
-                  const adjustedVal = originalVal + diff;
-                  if (adjustedVal >= 0) {
-                    const origStr = originalVal.toFixed(2);
-                    const adjStr = adjustedVal.toFixed(2);
-                    if (origStr.length === adjStr.length) {
-                      // Check if only exactly 1 character differs (excluding dots or commas)
-                      let diffCount = 0;
-                      let isDigitDiff = true;
-                      let misreadPair = '';
-                      for (let charIdx = 0; charIdx < origStr.length; charIdx++) {
-                        if (origStr[charIdx] !== adjStr[charIdx]) {
-                          diffCount++;
-                          misreadPair = origStr[charIdx] + adjStr[charIdx];
-                          // Make sure it's a digit character that changed
-                          if (!/\d/.test(origStr[charIdx]) || !/\d/.test(adjStr[charIdx])) {
-                            isDigitDiff = false;
-                          }
+          if (diff > 0 && values.rem > 0 && values.rem < 100 && (values.rem + diff) > 1000) {
+            console.log(`🎉 Self-healing REMOTO: ${values.rem} -> ${values.rem + diff}`);
+            values.rem = values.rem + diff;
+          } else if (diff > 0 && values.dem === 0) {
+            console.log(`🎉 Self-healing DEMANDA: 0 -> ${diff}`);
+            values.dem = diff;
+          } else if (diff !== 0) {
+            const cardsToCheck = ['prov', 'poss', 'rem', 'jud', 'classif', 'dem'];
+            for (const key of cardsToCheck) {
+              if (values[key] > 0) {
+                const originalVal = values[key];
+                const adjustedVal = originalVal + diff;
+                if (adjustedVal >= 0) {
+                  const origStr = originalVal.toFixed(2);
+                  const adjStr = adjustedVal.toFixed(2);
+                  if (origStr.length === adjStr.length) {
+                    let diffCount = 0;
+                    let isDigitDiff = true;
+                    let misreadPair = '';
+                    for (let charIdx = 0; charIdx < origStr.length; charIdx++) {
+                      if (origStr[charIdx] !== adjStr[charIdx]) {
+                        diffCount++;
+                        misreadPair = origStr[charIdx] + adjStr[charIdx];
+                        if (!/\d/.test(origStr[charIdx]) || !/\d/.test(adjStr[charIdx])) {
+                          isDigitDiff = false;
                         }
                       }
-                      const commonMisreads = ['68', '86', '38', '83', '98', '89', '08', '80', '56', '65', '17', '71', '90', '09', '58', '85'];
-                      if (diffCount === 1 && isDigitDiff && commonMisreads.includes(misreadPair)) {
-                        console.log(`🎉 Self-healing matched! Corrected ${key} from ${originalVal} to ${adjustedVal} to match total.`);
-                        values[key] = adjustedVal;
-                        break;
-                      }
+                    }
+                    const commonMisreads = ['68', '86', '38', '83', '98', '89', '08', '80', '56', '65', '17', '71', '90', '09', '58', '85'];
+                    if (diffCount === 1 && isDigitDiff && commonMisreads.includes(misreadPair)) {
+                      console.log(`🎉 Self-healing matched! Corrected ${key} from ${originalVal} to ${adjustedVal} to match total.`);
+                      values[key] = adjustedVal;
+                      break;
                     }
                   }
                 }
@@ -1192,6 +1148,7 @@
             }
           }
         }
+      }
 
       // Enable vector drawing if we have CNPJ, Empresa, OR any money values extracted
       const hasMoney = (values.prov > 0 || values.poss > 0 || values.jud > 0 || values.rem > 0 || values.deb > 0);
