@@ -409,11 +409,39 @@
               <input type="checkbox" id="vector-toggle-input" checked onchange="toggleVectorOptions()" style="width: 18px; height: 18px; cursor: pointer;" />
               <label for="vector-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Reconstruir layout de cards vetoriais (Mockup)</label>
             </div>
+
+            <!-- Hide Cards Toggle -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="hide-cards-toggle-input" onchange="generateResultImage()" style="width: 18px; height: 18px; cursor: pointer;" />
+              <label for="hide-cards-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.85rem; color: #38bdf8; font-weight: 600;">Exibir apenas Detalhamento da Análise (ocultar quadros de valores)</label>
+            </div>
           </div>
         </details>
 
         <!-- Collapsible Override Values Section -->
         <div id="vector-override-container" style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+          
+          <!-- Editable Header Fields -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.75rem; font-weight: bold; color: #1e3a8a;">✏️ Editar Dados do Cabeçalho</div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px;">Título do Relatório</label>
+                <input type="text" id="override-title-input" placeholder="Ex: Resultado Previdenciário" oninput="generateResultImage()" style="width: 100%; padding: 4px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a;" />
+              </div>
+              <div>
+                <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px;">Nome da Empresa</label>
+                <input type="text" id="override-empresa-input" placeholder="Ex: COMERCIAL ASTE..." oninput="generateResultImage()" style="width: 100%; padding: 4px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a;" />
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px;">CNPJ (Opcional)</label>
+              <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="generateResultImage()" style="width: 100%; padding: 4px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a;" />
+            </div>
+          </div>
+
           <h4 style="margin-top: 0; margin-bottom: 10px; color: #1e3a8a; font-size: 0.85rem;">Valores dos Cards (Extraídos)</h4>
           
           <div class="form-group" style="margin-bottom: 8px;">
@@ -1161,6 +1189,18 @@
           cnpj,
           values
         };
+
+        // Sync header input fields
+        const empresaInput = document.getElementById('override-empresa-input');
+        if (empresaInput && empresa) empresaInput.value = empresa.toUpperCase();
+
+        const cnpjInput = document.getElementById('override-cnpj-input');
+        if (cnpjInput && cnpj) cnpjInput.value = cnpj;
+
+        const titleInput = document.getElementById('override-title-input');
+        if (titleInput && !titleInput.value) {
+          titleInput.value = type === 'prev' ? 'Resultado Previdenciário' : 'Resultado Fiscal';
+        }
       } else {
         parsedCardData = null; // fallback to original print drawing
       }
@@ -1504,12 +1544,19 @@ function formatCurrency(val) {
           else detectedType = 'fiscal';
         }
 
+        const overrideEmpresa = document.getElementById('override-empresa-input') ? document.getElementById('override-empresa-input').value.trim() : '';
+        const overrideCnpj = document.getElementById('override-cnpj-input') ? document.getElementById('override-cnpj-input').value.trim() : '';
+        const overrideTitle = document.getElementById('override-title-input') ? document.getElementById('override-title-input').value.trim() : '';
+
         const type = (parsedCardData && parsedCardData.type) || detectedType || 'fiscal';
-        const empresa = extractedEmpresa || (parsedCardData && parsedCardData.empresa) || 'NÃO IDENTIFICADO';
+        const empresa = overrideEmpresa || extractedEmpresa || (parsedCardData && parsedCardData.empresa) || 'NÃO IDENTIFICADO';
+        const cnpj = overrideCnpj || (parsedCardData && parsedCardData.cnpj) || '';
+
+        const hideCards = document.getElementById('hide-cards-toggle-input') ? document.getElementById('hide-cards-toggle-input').checked : false;
 
         // Check if vector card reconstruction is enabled and supported for this template
         const showVector = document.getElementById('vector-toggle-input') ? document.getElementById('vector-toggle-input').checked : true;
-        const isVectorActive = showVector && parsedCardData && (type === 'prev' || type === 'fiscal' || type === 'juridico');
+        const isVectorActive = !hideCards && showVector && parsedCardData && (type === 'prev' || type === 'fiscal' || type === 'juridico');
         
         let activeCardsCount = 0;
         if (isVectorActive) {
@@ -1525,11 +1572,11 @@ function formatCurrency(val) {
         }
         const legendRowsCount = activeCardsCount > 3 ? 2 : 1;
         const hasTotalCard = isVectorActive && parsedCardData && (type === 'fiscal' || type === 'prev' || type === 'previdenciário');
-        const imgDrawHeight = isVectorActive 
+        const imgDrawHeight = hideCards ? 0 : (isVectorActive 
           ? (hasTotalCard 
               ? (legendRowsCount === 1 ? 420 : 455) 
               : (legendRowsCount === 1 ? 300 : 330)) 
-          : (img ? (sourceHeight * imgScale) : 0);
+          : (img ? (sourceHeight * imgScale) : 0));
         let imgHeight = imgDrawHeight + imgTopPadding;
 
         // Smart parse paragraphs
@@ -1609,19 +1656,15 @@ function formatCurrency(val) {
           ctx.fillRect(0, 0, canvasWidth, 150);
 
           // 2. Draw Title & Metadata inside the blue banner on the left (x = 80)
-          let titleText = 'Resultado Fiscal';
-          if (type === 'prev' || type === 'previdenciário') {
-            titleText = 'Resultado Previdenciário';
-          } else if (type === 'juridico') {
-            titleText = 'Resultado Jurídico';
-          }
+          let titleText = overrideTitle || (type === 'prev' || type === 'previdenciário' ? 'Resultado Previdenciário' : type === 'juridico' ? 'Resultado Jurídico' : 'Resultado Fiscal');
           
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 30px "Plus Jakarta Sans"';
           ctx.fillText(titleText, 80, 58);
 
           ctx.font = 'bold 16px "Plus Jakarta Sans"';
-          ctx.fillText('Empresa: ' + empresa, 80, 98);
+          const metaText = cnpj ? `Empresa: ${empresa} | CNPJ: ${cnpj}` : `Empresa: ${empresa}`;
+          ctx.fillText(metaText, 80, 98);
           
           ctx.fillStyle = '#cbd5e1'; // elegant light gray-blue
           ctx.fillText('Parceiro: ' + partner, 80, 124);
@@ -1629,7 +1672,6 @@ function formatCurrency(val) {
           // 3. Draw white logo inside banner on the right
           ctx.save();
           if (type === 'juridico' && logoAmandaArruda.complete && logoAmandaArruda.naturalWidth > 0) {
-            // Amanda Arruda Advocacia logo for Jurídico templates (make it white using filter)
             ctx.filter = 'brightness(0) invert(1)';
             const aaAspect = logoAmandaArruda.naturalWidth / logoAmandaArruda.naturalHeight;
             const aaH = 100;
@@ -1637,13 +1679,11 @@ function formatCurrency(val) {
             const aaX = canvasWidth - 80 - aaW;
             ctx.drawImage(logoAmandaArruda, aaX, 25, aaW, aaH);
           } else if (logoHorizontal.complete && logoHorizontal.naturalWidth > 0) {
-            // Gmaster horizontal logo (make it white using filter, scale it up and align right)
             ctx.filter = 'brightness(0) invert(1)';
             const logoW = 255;
             const logoH = 103;
             ctx.drawImage(logoHorizontal, canvasWidth - 80 - logoW, 23, logoW, logoH);
           } else {
-            // White text fallback if logos are not loaded (align right)
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 36px "Plus Jakarta Sans"';
             const gmText = 'Gmaster';
@@ -1660,9 +1700,9 @@ function formatCurrency(val) {
         }
 
         // Draw the pasted printout image directly below the metadata (or vector layout)
-        if (isVectorActive) {
+        if (isVectorActive && !hideCards) {
           drawVectorDesign(ctx, imgMargin, imgTopPadding, imgDrawWidth, imgDrawHeight, parsedCardData);
-        } else if (img) {
+        } else if (img && !hideCards) {
           ctx.drawImage(img, 0, cropTopY, img.width, sourceHeight, imgMargin, imgTopPadding, imgDrawWidth, imgDrawHeight);
         }
 
