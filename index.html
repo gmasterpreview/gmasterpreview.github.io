@@ -386,16 +386,43 @@
           <input type="text" id="partner-input" placeholder="Digite o nome do parceiro..." oninput="generateResultImage()" />
         </div>
 
-        <!-- Advanced Settings Collapsible Section -->
-        <details style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 15px; cursor: pointer; user-select: none;">
+        <!-- Analyst Text Input -->
+        <div class="form-group">
+          <label for="text-input">3. Texto do Analista</label>
+          <textarea class="text-area-analyst" id="text-input" placeholder="Cole o texto técnico gerado pelo analista aqui..." oninput="handleAnalystTextInput()"></textarea>
+        </div>
+
+        <!-- Unified Settings & Customization Accordion Section -->
+        <details id="main-settings-details" open style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 15px; cursor: pointer; user-select: none;">
           <summary style="font-size: 0.85rem; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; justify-content: space-between; outline: none; list-style: none;">
-            <span>⚙️ Configurações Avançadas</span>
+            <span>⚙️ Personalização & Ajustes do Relatório</span>
           </summary>
           <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px; cursor: default;" onclick="event.stopPropagation()">
             
-            <!-- Group 1: Header Options -->
+            <!-- Group A: Header Data Editing -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-              <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📌 Cabeçalho Azul Gmaster</div>
+              <div style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">✏️ Editar Dados do Cabeçalho</div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">TÍTULO DO RELATÓRIO</label>
+                  <input type="text" id="override-title-input" placeholder="Ex: Resultado Previdenciário" oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">NOME DA EMPRESA</label>
+                  <input type="text" id="override-empresa-input" placeholder="Ex: COMERCIAL ASTE..." oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">CNPJ (OPCIONAL)</label>
+                <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="this.value = this.value.replace(/[^\d.\/\-]/g, ''); generateResultImage();" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+              </div>
+            </div>
+
+            <!-- Group B: Header Banner Toggles -->
+            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📌 Opções do Cabeçalho Azul</div>
               
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" id="header-toggle-input" checked onchange="toggleHeaderOptions()" style="width: 16px; height: 16px; cursor: pointer;" />
@@ -413,7 +440,7 @@
               </div>
             </div>
 
-            <!-- Group 2: Cards & Layout Options -->
+            <!-- Group C: Cards & Layout Options -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
               <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📊 Quadros de Valores & Cards</div>
               
@@ -426,6 +453,22 @@
                 <input type="checkbox" id="hide-cards-toggle-input" onchange="generateResultImage()" style="width: 16px; height: 16px; cursor: pointer;" />
                 <label for="hide-cards-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.82rem; color: #38bdf8; font-weight: 600;">Exibir apenas Detalhamento da Análise (ocultar quadros)</label>
               </div>
+
+              <!-- Extracted Card Values Grid Wrapper -->
+              <div id="vector-override-container" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <label style="font-size: 0.75rem; margin-bottom: 4px; display: block; color: #94a3b8; font-weight: bold;">Tipo de Relatório</label>
+                  <select id="override-type-select" onchange="changeOverrideType()" style="width: 100%; padding: 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600;">
+                    <option value="prev">Previdenciário</option>
+                    <option value="fiscal">Fiscal</option>
+                  </select>
+                </div>
+
+                <div id="override-fields-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <!-- Dynamic input fields -->
+                </div>
+              </div>
+
             </div>
 
           </div>
@@ -468,12 +511,6 @@
           <div id="override-fields-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <!-- Dynamic input fields -->
           </div>
-        </div>
-
-        <!-- Analyst Text Input -->
-        <div class="form-group">
-          <label for="text-input">3. Texto do Analista</label>
-          <textarea class="text-area-analyst" id="text-input" placeholder="Cole o texto técnico gerado pelo analista aqui..." oninput="handleAnalystTextInput()"></textarea>
         </div>
 
       </div>
@@ -1202,6 +1239,7 @@
           cnpj,
           values
         };
+        initializeEnabledCards(parsedCardData);
 
         // Sync header input fields
         const empresaInput = document.getElementById('override-empresa-input');
@@ -1503,7 +1541,7 @@ function formatCurrency(val) {
         const sourceHeight = img ? (img.height - cropTopY) : 0;
 
         // Draw Gmaster header banner, title, metadata at the top if showHeader is true
-        const imgTopPadding = showHeader ? 180 : 20;
+        const imgTopPadding = showHeader ? 260 : 20;
 
         // Configure typography
         ctx.font = '21px "Plus Jakarta Sans", sans-serif';
@@ -1549,8 +1587,8 @@ function formatCurrency(val) {
 
         // Default Header fallback if we didn't extract any from text
         if (!detectedType) {
-          const isPrev = rawText.toLowerCase().includes('previdenciário') || rawText.toLowerCase().includes('esocial') || rawText.toLowerCase().includes('nivel');
-          const isJur = false; // rawText.toLowerCase().includes('jurídico') || rawText.toLowerCase().includes('capag') || rawText.toLowerCase().includes('pgfn');
+          const isPrev = rawText.toLowerCase().includes('previdenciário') || rawText.toLowerCase().includes('previdenciario') || rawText.toLowerCase().includes('esocial') || rawText.toLowerCase().includes('nivel');
+          const isJur = false; 
           
           if (isPrev) detectedType = 'prev';
           else if (isJur) detectedType = 'juridico';
@@ -1584,12 +1622,7 @@ function formatCurrency(val) {
           }
         }
         const legendRowsCount = activeCardsCount > 3 ? 2 : 1;
-        const hasTotalCard = isVectorActive && parsedCardData && (type === 'fiscal' || type === 'prev' || type === 'previdenciário');
-        const imgDrawHeight = hideCards ? 0 : (isVectorActive 
-          ? (hasTotalCard 
-              ? (legendRowsCount === 1 ? 420 : 455) 
-              : (legendRowsCount === 1 ? 300 : 330)) 
-          : (img ? (sourceHeight * imgScale) : 0));
+        const imgDrawHeight = hideCards ? 0 : (isVectorActive ? (legendRowsCount === 1 ? 300 : 330) : (img ? (sourceHeight * imgScale) : 0));
         let imgHeight = imgDrawHeight + imgTopPadding;
 
         // Smart parse paragraphs
@@ -1666,61 +1699,110 @@ function formatCurrency(val) {
         if (showHeader) {
           // 1. Draw Deep Blue Header Banner
           ctx.fillStyle = '#1b4372';
-          ctx.fillRect(0, 0, canvasWidth, 150);
+          ctx.fillRect(0, 0, canvasWidth, 110);
 
-          // 2. Draw Title & Metadata inside the blue banner on the left (x = 80)
-          let titleText = overrideTitle || (type === 'prev' || type === 'previdenciário' ? 'Resultado Previdenciário' : type === 'juridico' ? 'Resultado Jurídico' : 'Resultado Fiscal');
-          
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 30px "Plus Jakarta Sans"';
-          ctx.fillText(titleText, 80, 58);
-
-          ctx.font = 'bold 16px "Plus Jakarta Sans"';
-          const metaText = cnpj ? `Empresa: ${empresa} | CNPJ: ${cnpj}` : `Empresa: ${empresa}`;
-          ctx.fillText(metaText, 80, partner ? 95 : 108);
-          
-          if (partner) {
-            ctx.fillStyle = '#cbd5e1'; // elegant light gray-blue
-            ctx.fillText('Parceiro: ' + partner, 80, 124);
-          }
-
-          // 3. Draw white logo inside banner on the right if enabled
+          // 2. Draw white logo inside banner if enabled
           const showLogo = document.getElementById('logo-toggle-input') ? document.getElementById('logo-toggle-input').checked : true;
           if (showLogo) {
             ctx.save();
             if (type === 'juridico' && logoAmandaArruda.complete && logoAmandaArruda.naturalWidth > 0) {
               ctx.filter = 'brightness(0) invert(1)';
               const aaAspect = logoAmandaArruda.naturalWidth / logoAmandaArruda.naturalHeight;
-              const aaH = 100;
+              const aaH = 70;
               const aaW = aaH * aaAspect;
-              const aaX = canvasWidth - 80 - aaW;
-              ctx.drawImage(logoAmandaArruda, aaX, 25, aaW, aaH);
+              ctx.drawImage(logoAmandaArruda, 80, 20, aaW, aaH);
             } else if (logoHorizontal.complete && logoHorizontal.naturalWidth > 0) {
               ctx.filter = 'brightness(0) invert(1)';
-              const logoW = 255;
-              const logoH = 103;
-              ctx.drawImage(logoHorizontal, canvasWidth - 80 - logoW, 23, logoW, logoH);
+              ctx.drawImage(logoHorizontal, 80, 20, 175, 71);
             } else {
+              ctx.font = 'bold 26px "Plus Jakarta Sans"';
               ctx.fillStyle = '#ffffff';
-              ctx.font = 'bold 36px "Plus Jakarta Sans"';
-              const gmText = 'Gmaster';
-              const gmW = ctx.measureText(gmText).width;
-              ctx.fillText(gmText, canvasWidth - 80 - gmW, 75);
-
+              ctx.fillText('Gmaster', 80, 68);
+              ctx.font = '14px "Plus Jakarta Sans"';
               ctx.fillStyle = '#cbd5e1';
-              ctx.font = '18px "Plus Jakarta Sans"';
-              const subText = 'eficiência tributária';
-              const subW = ctx.measureText(subText).width;
-              ctx.fillText(subText, canvasWidth - 80 - subW, 108);
+              ctx.fillText('eficiência tributária', 190, 65);
             }
             ctx.restore();
+          }
+
+          // 3. Draw Title (Left-aligned, bold, dark blue)
+          let titleText = overrideTitle || (type === 'prev' || type === 'previdenciário' ? 'Resultado Previdenciário' : type === 'juridico' ? 'Resultado Jurídico' : 'Resultado Fiscal');
+          ctx.fillStyle = '#1b4372';
+          ctx.font = 'bold 32px "Plus Jakarta Sans"';
+          ctx.fillText(titleText, 80, 165);
+
+          // 4. Draw Metadata (Left-aligned, bold, dark blue)
+          ctx.font = 'bold 18px "Plus Jakarta Sans"';
+          const metaText = cnpj ? `Empresa: ${empresa} | CNPJ: ${cnpj}` : `Empresa: ${empresa}`;
+          ctx.fillText(metaText, 80, partner ? 205 : 215);
+          if (partner) {
+            ctx.fillText('Parceiro: ' + partner, 80, 233);
+          }
+
+          // 5. Draw Total Opportunities Badge on the right if vector layout is active
+          if (isVectorActive && parsedCardData && (type === 'fiscal' || type === 'prev' || type === 'previdenciário')) {
+            let totalVal = 0;
+            const typeKey = parsedCardData.type;
+            const allCards = [
+              { key: 'prov' }, { key: 'poss' }, { key: 'rem' }, 
+              { key: 'jud' }, { key: 'dem' }, { key: 'classif' }
+            ];
+            let activeKeys = [];
+            allCards.forEach(c => {
+              if (parsedCardData.enabledCards && parsedCardData.enabledCards[c.key]) {
+                activeKeys.push(c.key);
+              }
+            });
+            if (activeKeys.length === 0) {
+              const defaults = typeKey === 'prev' ? ['prov', 'poss', 'rem'] : ['prov', 'poss', 'jud', 'classif'];
+              allCards.forEach(c => {
+                if (defaults.includes(c.key)) activeKeys.push(c.key);
+              });
+            }
+            activeKeys.forEach(k => {
+              totalVal += (parsedCardData.values[k] || 0);
+            });
+
+            // Draw Card Box
+            const badgeW = 400;
+            const badgeH = 92;
+            const badgeX = canvasWidth - 80 - badgeW;
+            const badgeY = 145;
+
+            // Box shadow & background
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.04)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 4;
+            
+            ctx.fillStyle = '#f8fafc'; // light slate background
+            drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 10);
+            ctx.fill();
+            ctx.restore();
+
+            // Border
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.2;
+            drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 10);
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = '#64748b'; // slate-500
+            ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+            ctx.fillText('VALOR TOTAL DAS OPORTUNIDADES', badgeX + 24, badgeY + 30);
+
+            // Value text
+            ctx.fillStyle = '#1b4372'; // corporate blue
+            ctx.font = 'bold 28px "Plus Jakarta Sans", sans-serif';
+            ctx.fillText('R$ ' + formatMoneyRaw(totalVal), badgeX + 24, badgeY + 68);
           }
         }
 
         // Draw the pasted printout image directly below the metadata (or vector layout)
-        if (isVectorActive && !hideCards) {
+        if (isVectorActive) {
           drawVectorDesign(ctx, imgMargin, imgTopPadding, imgDrawWidth, imgDrawHeight, parsedCardData);
-        } else if (img && !hideCards) {
+        } else if (img) {
           ctx.drawImage(img, 0, cropTopY, img.width, sourceHeight, imgMargin, imgTopPadding, imgDrawWidth, imgDrawHeight);
         }
 
@@ -1735,7 +1817,7 @@ function formatCurrency(val) {
         }
 
         // Render typography lines below the image
-        let currentY = hideCards ? (showHeader ? 230 : 65) : (imgHeight + 85);
+        let currentY = hideCards ? (showHeader ? 310 : 65) : (imgHeight + 85);
 
         wrappedLines.forEach(lineObj => {
           if (lineObj.type === 'empty') {
@@ -1980,7 +2062,7 @@ function formatCurrency(val) {
       });
       
       ctx.save();
-
+      
       // Draw the centered full-width "Valor Total das Oportunidades" box if applicable
       const hasTotalCard = type === 'fiscal' || type === 'prev' || type === 'previdenciário';
       if (hasTotalCard) {
@@ -2017,7 +2099,7 @@ function formatCurrency(val) {
         ctx.fillText('R$ ' + formatMoneyRaw(totalVal), badgeX + badgeW / 2, badgeY + 68);
         ctx.restore();
       }
-      
+
       // 1. Draw Cards
       for (let i = 0; i < numCards; i++) {
         const key = activeKeys[i];
