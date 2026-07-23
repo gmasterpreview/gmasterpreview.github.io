@@ -555,23 +555,23 @@
 
     function initializeEnabledCards(data) {
       if (!data) return;
-      if (!data.enabledCards) {
-        if (data.type === 'juridico') {
-          data.enabledCards = {
-            deb: true,
-            desc: true,
-            ent: true,
-            prest: true
-          };
-        } else {
-          data.enabledCards = {
-            prov: (data.values.prov > 0),
-            poss: (data.values.poss > 0),
-            rem: (data.values.rem > 0 || data.type === 'prev'),
-            jud: (data.values.jud > 0 || data.type === 'fiscal'),
-            classif: (data.values.classif > 0 || data.type === 'fiscal'),
-            dem: (data.values.dem > 0)
-          };
+      if (!data.enabledCards || Object.keys(data.enabledCards).length === 0) {
+        data.enabledCards = {};
+      }
+      if (data.type === 'juridico') {
+        data.enabledCards.deb = (data.values && data.values.deb > 0);
+        data.enabledCards.desc = (data.values && data.values.desc > 0);
+        data.enabledCards.ent = (data.values && data.values.ent > 0);
+        data.enabledCards.prest = (data.values && data.values.prest > 0);
+      } else {
+        ['prov', 'poss', 'rem', 'jud', 'dem', 'classif'].forEach(k => {
+          if (data.values && data.values[k] > 0) {
+            data.enabledCards[k] = true;
+          }
+        });
+        if (data.type === 'fiscal') {
+          if (data.enabledCards.jud === undefined) data.enabledCards.jud = true;
+          if (data.enabledCards.classif === undefined) data.enabledCards.classif = true;
         }
       }
     }
