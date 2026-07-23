@@ -995,10 +995,12 @@
             const val = parseRobustFloat(mMatch[1]);
             if (!isNaN(val) && val > 0) lineMoneyValues.push(val);
           }
-          if (lineMoneyValues.length >= 3 && lineMoneyValues.length <= 4) {
+          if (lineMoneyValues.length === 4) {
+            cardLineValues = lineMoneyValues;
+            break;
+          } else if (lineMoneyValues.length === 3 && totalVal > 0) {
             const lineSum = lineMoneyValues.reduce((a, b) => a + b, 0);
-            // Only accept card line if sum matches totalVal or if totalVal is not found
-            if (!totalVal || Math.abs(lineSum - totalVal) < 5.0) {
+            if (Math.abs(lineSum - totalVal) < 5.0) {
               cardLineValues = lineMoneyValues;
               break;
             }
