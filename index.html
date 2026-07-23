@@ -392,14 +392,35 @@
           <textarea class="text-area-analyst" id="text-input" placeholder="Cole o texto técnico gerado pelo analista aqui..." oninput="handleAnalystTextInput()"></textarea>
         </div>
 
-        <!-- Advanced Settings Collapsible Section -->
+        <!-- Advanced Settings & Customization Collapsible Section -->
         <details style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 15px; cursor: pointer; user-select: none;">
           <summary style="font-size: 0.85rem; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; justify-content: space-between; outline: none; list-style: none;">
-            <span>⚙️ Configurações Avançadas</span>
+            <span>⚙️ Configurações Avançadas & Edição do Relatório</span>
           </summary>
           <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px; cursor: default;" onclick="event.stopPropagation()">
             
-            <!-- Group 1: Header Options -->
+            <!-- Group 1: Editable Header Fields -->
+            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">✏️ Editar Dados do Cabeçalho</div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">TÍTULO DO RELATÓRIO</label>
+                  <input type="text" id="override-title-input" placeholder="Ex: Resultado Previdenciário" oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #334155; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+                </div>
+                <div>
+                  <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">NOME DA EMPRESA</label>
+                  <input type="text" id="override-empresa-input" placeholder="Ex: COMERCIAL ASTE..." oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #334155; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: bold;">CNPJ (OPCIONAL)</label>
+                <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="this.value = this.value.replace(/[^\d.\/\-]/g, ''); generateResultImage();" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #334155; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
+              </div>
+            </div>
+
+            <!-- Group 2: Header Options -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
               <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📌 Cabeçalho Azul Gmaster</div>
               
@@ -419,7 +440,7 @@
               </div>
             </div>
 
-            <!-- Group 2: Cards & Layout Options -->
+            <!-- Group 3: Cards & Layout Options -->
             <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
               <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📊 Quadros de Valores & Cards</div>
               
@@ -432,49 +453,27 @@
                 <input type="checkbox" id="hide-cards-toggle-input" onchange="generateResultImage()" style="width: 16px; height: 16px; cursor: pointer;" />
                 <label for="hide-cards-toggle-input" style="margin-bottom: 0; cursor: pointer; user-select: none; font-size: 0.82rem; color: #38bdf8; font-weight: 600;">Exibir apenas Detalhamento da Análise (ocultar quadros)</label>
               </div>
+
+              <!-- Collapsible Override Values Section inside Group 3 -->
+              <div id="vector-override-container" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
+                <div style="font-size: 0.75rem; font-weight: bold; color: #cbd5e1; margin-bottom: 6px;">Valores dos Cards (Extraídos)</div>
+                
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <label style="font-size: 0.75rem; margin-bottom: 4px; display: block; color: #94a3b8;">Tipo de Relatório</label>
+                  <select id="override-type-select" onchange="changeOverrideType()" style="width: 100%; padding: 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600;">
+                    <option value="prev">Previdenciário</option>
+                    <option value="fiscal">Fiscal</option>
+                  </select>
+                </div>
+
+                <div id="override-fields-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <!-- Dynamic input fields -->
+                </div>
+              </div>
             </div>
 
           </div>
         </details>
-
-        <!-- Collapsible Override Values Section -->
-        <div id="vector-override-container" style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-          
-          <!-- Editable Header Fields -->
-          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
-            <div style="font-size: 0.75rem; font-weight: bold; color: #1e3a8a;">✏️ Editar Dados do Cabeçalho</div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <div>
-                <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px; font-weight: bold;">TÍTULO DO RELATÓRIO</label>
-                <input type="text" id="override-title-input" placeholder="Ex: Resultado Previdenciário" oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
-              </div>
-              <div>
-                <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px; font-weight: bold;">NOME DA EMPRESA</label>
-                <input type="text" id="override-empresa-input" placeholder="Ex: COMERCIAL ASTE..." oninput="generateResultImage()" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
-              </div>
-            </div>
-
-            <div>
-              <label style="font-size: 0.7rem; color: #475569; display: block; margin-bottom: 2px; font-weight: bold;">CNPJ (OPCIONAL)</label>
-              <input type="text" id="override-cnpj-input" placeholder="Ex: 04.411.431/0001-00" oninput="this.value = this.value.replace(/[^\d.\/\-]/g, ''); generateResultImage();" style="width: 100%; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #94a3b8; border-radius: 4px; background-color: #ffffff !important; color: #0f172a !important; font-weight: 600;" />
-            </div>
-          </div>
-
-          <h4 style="margin-top: 0; margin-bottom: 10px; color: #1e3a8a; font-size: 0.85rem;">Valores dos Cards (Extraídos)</h4>
-          
-          <div class="form-group" style="margin-bottom: 8px;">
-            <label style="font-size: 0.75rem; margin-bottom: 4px; display: block; color: var(--text-secondary);">Tipo de Relatório</label>
-            <select id="override-type-select" onchange="changeOverrideType()" style="width: 100%; padding: 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600;">
-              <option value="prev">Previdenciário</option>
-              <option value="fiscal">Fiscal</option>
-            </select>
-          </div>
-
-          <div id="override-fields-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <!-- Dynamic input fields -->
-          </div>
-        </div>
 
       </div>
 
