@@ -686,34 +686,22 @@
       if (parsedValues.type) parsedCardData.type = parsedValues.type;
       if (parsedValues.empresa) parsedCardData.empresa = parsedValues.empresa;
       
-      if (parsedCardData.type === 'prev') {
-        if (!ocrParsedBoxValues) {
-          if (parsedValues.prov > 0) parsedCardData.values.prov = parsedValues.prov;
-          if (parsedValues.poss > 0) parsedCardData.values.poss = parsedValues.poss;
-          if (parsedValues.rem > 0) parsedCardData.values.rem = parsedValues.rem;
-          if (parsedValues.dem > 0) parsedCardData.values.dem = parsedValues.dem;
+      if (!parsedCardData.enabledCards) parsedCardData.enabledCards = {};
+
+      // Analyst text values always update cards (takes precedence over OCR misreads)
+      const keysToSync = ['prov', 'poss', 'rem', 'jud', 'dem', 'classif', 'deb', 'desc', 'ent', 'prest'];
+      keysToSync.forEach(k => {
+        if (parsedValues[k] > 0) {
+          parsedCardData.values[k] = parsedValues[k];
+          parsedCardData.enabledCards[k] = true;
         }
-      } else if (parsedCardData.type === 'fiscal') {
-        if (!ocrParsedBoxValues) {
-          if (parsedValues.prov > 0) parsedCardData.values.prov = parsedValues.prov;
-          if (parsedValues.poss > 0) parsedCardData.values.poss = parsedValues.poss;
-          if (parsedValues.jud > 0) parsedCardData.values.jud = parsedValues.jud;
-          if (parsedValues.classif > 0) parsedCardData.values.classif = parsedValues.classif;
-        }
-      } else if (parsedCardData.type === 'juridico') {
-        if (!ocrParsedBoxValues) {
-          if (parsedValues.deb > 0) parsedCardData.values.deb = parsedValues.deb;
-          if (parsedValues.desc > 0) parsedCardData.values.desc = parsedValues.desc;
-          if (parsedValues.ent > 0) parsedCardData.values.ent = parsedValues.ent;
-          if (parsedValues.prest > 0) parsedCardData.values.prest = parsedValues.prest;
-        }
-      }
+      });
 
       renderOverrideFields();
       generateResultImage();
     }
 
-    // Smart Analyst text parser (extracts levels like "Nível 1" or labels "Provável" and sums them up)
+    // Smart Analyst text parser (extracts levels like "Nível 1" or labels "Provável", "Demanda" and sums/assigns them)
     function parseAnalystTextValues(text) {
       const result = { prov: 0, poss: 0, rem: 0, dem: 0, jud: 0, classif: 0, deb: 0, desc: 0, ent: 0, prest: 0, type: null, empresa: '' };
 
@@ -738,74 +726,48 @@
         }
       }
 
-      // Parse R$ values associated with levels (Nível 1, 2, 3)
-      const levelRegex = /(?:N[íi]vel\s*(\d+))[^\n]*?R\$\s*([\d.,]+)/gi;
-      let match;
-      while ((match = levelRegex.exec(text)) !== null) {
-        const level = parseInt(match[1]);
-        const val = parseRobustFloat(match[2]);
-        if (!isNaN(val)) {
-          if (level === 1) {
-            result.prov += val;
-          } else if (level === 2) {
-            result.poss += val;
-          } else if (level === 3) {
-            result.rem += val;
-          } else if (level === 4) {
-            result.dem += val;
-          }
-        }
-      }
+      lines.forEach(line => {
+        const lowerLine = line.toLowerCase();
+        const moneyMatch = line.match(/R\$\s*([\d.,]+)/i) || line.match(/([\d]{1,3}(?:\.[\d]{3})*,\d{2})/);
+        if (!moneyMatch) return;
+        
+        const val = parseRobustFloat(moneyMatch[1]);
+        if (isNaN(val) || val <= 0) return;
 
-      // Fallbacks if no Nível matches were found (checks word associations preceding each money value)
-      if (result.prov === 0 && result.poss === 0 && result.rem === 0 && result.deb === 0 && result.desc === 0 && result.ent === 0 && result.prest === 0) {
-        const moneyRegexGlobal = /R\$\s*([\d.,]+)/gi;
-        const matches = [];
-        let m;
-        while ((m = moneyRegexGlobal.exec(text)) !== null) {
-          const val = parseRobustFloat(m[1]);
-          if (!isNaN(val)) {
-            matches.push({ val, index: m.index });
-          }
+        const levelMatch = lowerLine.match(/n[íi]vel\s*(\d+)/);
+        if (levelMatch) {
+          const lvl = parseInt(levelMatch[1]);
+          if (lvl === 1) result.prov = val;
+          else if (lvl === 2) result.poss = val;
+          else if (lvl === 3) result.rem = val;
+          else if (lvl === 4) result.dem = val;
+          return;
         }
 
-        let lastIdx = 0;
-        matches.forEach((item, index) => {
-          // Extract preceding segment describing this value
-          const segment = text.substring(lastIdx, item.index);
-          lastIdx = item.index + 5; // move past this match
-
-          const lowerSeg = segment.toLowerCase();
-          
-          if (result.type === 'juridico') {
-            if (lowerSeg.includes('débito') || lowerSeg.includes('debito') || lowerSeg.includes('consolidado') || lowerSeg.includes('dívida') || lowerSeg.includes('divida')) {
-              result.deb = item.val;
-            } else if (lowerSeg.includes('desconto') || lowerSeg.includes('economia')) {
-              result.desc = item.val;
-            } else if (lowerSeg.includes('entrada') || lowerSeg.includes('inicial')) {
-              result.ent = item.val;
-            } else if (lowerSeg.includes('prestação') || lowerSeg.includes('prestacao') || lowerSeg.includes('parcela') || lowerSeg.includes('mensal')) {
-              result.prest = item.val;
-            }
-          } else {
-            let category = 'prov'; // default to Provável for fiscal opportunities
-            
-            if (lowerSeg.includes('possível') || lowerSeg.includes('possivel') || lowerSeg.includes('insumos')) {
-              category = 'poss';
-            } else if (lowerSeg.includes('remoto') || lowerSeg.includes('demanda')) {
-              category = 'rem';
-            }
-            
-            if (category === 'prov') {
-              result.prov += item.val;
-            } else if (category === 'poss') {
-              result.poss += item.val;
-            } else if (category === 'rem') {
-              result.rem += item.val;
-            }
+        if (lowerLine.includes('demanda')) {
+          result.dem = val;
+        } else if (lowerLine.includes('judicial')) {
+          result.jud = val;
+        } else if (lowerLine.includes('classificar') || lowerLine.includes('classif')) {
+          result.classif = val;
+        } else if (lowerLine.includes('remoto')) {
+          result.rem = val;
+        } else if (lowerLine.includes('possível') || lowerLine.includes('possivel')) {
+          result.poss = val;
+        } else if (lowerLine.includes('provável') || lowerLine.includes('provavel')) {
+          result.prov = val;
+        } else if (result.type === 'juridico') {
+          if (lowerLine.includes('débito') || lowerLine.includes('debito') || lowerLine.includes('consolidado')) {
+            result.deb = val;
+          } else if (lowerLine.includes('desconto') || lowerLine.includes('economia')) {
+            result.desc = val;
+          } else if (lowerLine.includes('entrada')) {
+            result.ent = val;
+          } else if (lowerLine.includes('prestação') || lowerLine.includes('prestacao') || lowerLine.includes('parcela')) {
+            result.prest = val;
           }
-        });
-      }
+        }
+      });
 
       return result;
     }
