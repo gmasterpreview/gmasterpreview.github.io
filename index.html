@@ -569,6 +569,7 @@
     };
 
     window.onload = () => {
+      renderOverrideFields();
       let loadedLogos = 0;
       const checkLogos = () => {
         loadedLogos++;
@@ -598,32 +599,33 @@
       return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function initializeEnabledCards(data) {
-      if (!data) return;
-      if (!data.enabledCards || Object.keys(data.enabledCards).length === 0) {
-        data.enabledCards = {};
-      }
-      if (data.type === 'juridico') {
-        data.enabledCards.deb = (data.values && data.values.deb > 0);
-        data.enabledCards.desc = (data.values && data.values.desc > 0);
-        data.enabledCards.ent = (data.values && data.values.ent > 0);
-        data.enabledCards.prest = (data.values && data.values.prest > 0);
-      } else {
-        ['prov', 'poss', 'rem', 'jud', 'dem', 'classif'].forEach(k => {
-          if (data.values && data.values[k] > 0) {
-            data.enabledCards[k] = true;
-          }
-        });
-        if (data.type === 'fiscal') {
-          if (data.enabledCards.jud === undefined) data.enabledCards.jud = true;
-          if (data.enabledCards.classif === undefined) data.enabledCards.classif = true;
-        }
+    function ensureParsedCardData() {
+      if (!parsedCardData) {
+        parsedCardData = {
+          type: 'prev',
+          empresa: '',
+          cnpj: '',
+          values: { prov: 0, poss: 0, rem: 0, jud: 0, dem: 0, classif: 0, deb: 0, desc: 0, ent: 0, prest: 0, rating: 'C' },
+          enabledCards: { prov: true, poss: true, rem: true, jud: true, dem: true, classif: true, deb: true, desc: true, ent: true, prest: true }
+        };
       }
     }
 
+    function initializeEnabledCards(data) {
+      if (!data) return;
+      if (!data.enabledCards) {
+        data.enabledCards = {};
+      }
+      const allKeys = ['prov', 'poss', 'rem', 'jud', 'dem', 'classif', 'deb', 'desc', 'ent', 'prest'];
+      allKeys.forEach(k => {
+        if (data.enabledCards[k] === undefined) {
+          data.enabledCards[k] = true;
+        }
+      });
+    }
+
     function toggleCardEnabled(key, checked) {
-      if (!parsedCardData) return;
-      if (!parsedCardData.enabledCards) parsedCardData.enabledCards = {};
+      ensureParsedCardData();
       parsedCardData.enabledCards[key] = checked;
       renderOverrideFields();
       generateResultImage();
@@ -635,11 +637,12 @@
       const box = document.getElementById('vector-override-container');
       const showVector = document.getElementById('vector-toggle-input') ? document.getElementById('vector-toggle-input').checked : true;
       
-      if (!parsedCardData || !showVector) {
+      if (!showVector) {
         box.style.display = 'none';
         return;
       }
       
+      ensureParsedCardData();
       box.style.display = 'block';
       select.value = parsedCardData.type;
       
@@ -686,7 +689,7 @@
     }
 
     function changeOverrideType() {
-      if (!parsedCardData) return;
+      ensureParsedCardData();
       const select = document.getElementById('override-type-select');
       parsedCardData.type = select.value;
       renderOverrideFields();
@@ -694,7 +697,7 @@
     }
 
     function updateOverrideValue(key, val) {
-      if (!parsedCardData) return;
+      ensureParsedCardData();
       const cleanVal = parseRobustFloat(val);
       if (!isNaN(cleanVal)) {
         parsedCardData.values[key] = cleanVal;
