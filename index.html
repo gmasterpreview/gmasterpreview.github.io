@@ -468,6 +468,7 @@
                   <select id="override-type-select" onchange="changeOverrideType()" style="width: 100%; padding: 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600;">
                     <option value="prev">Previdenciário</option>
                     <option value="fiscal">Fiscal</option>
+                    <option value="juridico">Jurídico</option>
                   </select>
                 </div>
 
@@ -1535,7 +1536,7 @@ function formatCurrency(val) {
             extractedEmpresa = firstLineMatch[1].trim().toUpperCase();
             detectedType = firstLineMatch[2].toLowerCase();
             if (detectedType === 'jurídico' || detectedType === 'juridico') {
-              detectedType = 'fiscal';
+              detectedType = 'juridico';
             }
             cleanedBodyText = lines.slice(1).join('\n').trim();
           }
@@ -1553,7 +1554,7 @@ function formatCurrency(val) {
         // Default Header fallback if we didn't extract any from text
         if (!detectedType) {
           const isPrev = rawText.toLowerCase().includes('previdenciário') || rawText.toLowerCase().includes('esocial') || rawText.toLowerCase().includes('nivel');
-          const isJur = false; // rawText.toLowerCase().includes('jurídico') || rawText.toLowerCase().includes('capag') || rawText.toLowerCase().includes('pgfn');
+          const isJur = rawText.toLowerCase().includes('jurídico') || rawText.toLowerCase().includes('juridico');
           
           if (isPrev) detectedType = 'prev';
           else if (isJur) detectedType = 'juridico';
@@ -1575,9 +1576,9 @@ function formatCurrency(val) {
 
         const hideCards = document.getElementById('hide-cards-toggle-input') ? document.getElementById('hide-cards-toggle-input').checked : false;
 
-        // Check if vector card reconstruction is enabled and supported for this template
+        // Check if vector card reconstruction is enabled (Apenas para Previdenciário e Fiscal; Jurídico usa a imagem do print direto sem modificar nada)
         const showVector = document.getElementById('vector-toggle-input') ? document.getElementById('vector-toggle-input').checked : true;
-        const isVectorActive = !hideCards && showVector && parsedCardData && (type === 'prev' || type === 'fiscal' || type === 'juridico');
+        const isVectorActive = !hideCards && showVector && parsedCardData && (type === 'prev' || type === 'fiscal');
         
         let activeCardsCount = 0;
         if (isVectorActive) {
