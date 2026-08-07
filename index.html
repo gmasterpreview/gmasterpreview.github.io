@@ -1502,29 +1502,7 @@ function formatCurrency(val) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
-        const canvasWidth = 1200;
-        let imgMargin = 80;
-        const imgDrawWidth = canvasWidth - (imgMargin * 2);
-        const imgScale = img ? (imgDrawWidth / img.width) : 1;
-
-        // Check if Gmaster header banner and auto-crop should be included
-        const showHeader = document.getElementById('header-toggle-input') ? document.getElementById('header-toggle-input').checked : true;
-        const autoCrop = (img && type !== 'juridico') ? (document.getElementById('crop-toggle-input') ? document.getElementById('crop-toggle-input').checked : false) : false;
-
-        // Calculate crop offset from original image if header and crop are enabled
-        const cropTopY = (img && showHeader && autoCrop) ? Math.floor(img.width * (228 / 1200)) : 0;
-        const sourceHeight = img ? (img.height - cropTopY) : 0;
-
-        // Draw Gmaster header banner, title, metadata at the top if showHeader is true
-        const imgTopPadding = showHeader ? 180 : 20;
-
-        // Configure typography
-        ctx.font = '21px "Plus Jakarta Sans", sans-serif';
-        const margin = 80;
-        const maxTextWidth = canvasWidth - (margin * 2);
-        const lineHeight = 36;
-
-        // Extract metadata from pasted text
+        // Extract metadata from pasted text FIRST so 'type' is known before cropping calculations
         let extractedEmpresa = '';
         let detectedType = '';
         const lines = rawText.split('\n');
@@ -1567,6 +1545,28 @@ function formatCurrency(val) {
         const overrideTitle = document.getElementById('override-title-input') ? document.getElementById('override-title-input').value.trim() : '';
 
         const type = (parsedCardData && parsedCardData.type) || detectedType || 'fiscal';
+
+        const canvasWidth = 1200;
+        let imgMargin = 80;
+        const imgDrawWidth = canvasWidth - (imgMargin * 2);
+        const imgScale = img ? (imgDrawWidth / img.width) : 1;
+
+        // Check if Gmaster header banner and auto-crop should be included
+        const showHeader = document.getElementById('header-toggle-input') ? document.getElementById('header-toggle-input').checked : true;
+        const autoCrop = (img && type !== 'juridico') ? (document.getElementById('crop-toggle-input') ? document.getElementById('crop-toggle-input').checked : false) : false;
+
+        // Calculate crop offset from original image if header and crop are enabled
+        const cropTopY = (img && showHeader && autoCrop) ? Math.floor(img.width * (228 / 1200)) : 0;
+        const sourceHeight = img ? (img.height - cropTopY) : 0;
+
+        // Draw Gmaster header banner, title, metadata at the top if showHeader is true
+        const imgTopPadding = showHeader ? 180 : 20;
+
+        // Configure typography
+        ctx.font = '21px "Plus Jakarta Sans", sans-serif';
+        const margin = 80;
+        const maxTextWidth = canvasWidth - (margin * 2);
+        const lineHeight = 36;
         
         // If user cleared the empresa input explicitly, respect empty string instead of forced fallback
         const empresa = overrideEmpresaInput 
