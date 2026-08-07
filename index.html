@@ -1255,15 +1255,21 @@ const logoAmandaArruda = new Image();
         }
       }
 
-      // Enable vector drawing if we have CNPJ, Empresa, OR any money values extracted
+      // Enable vector drawing if we have CNPJ, Empresa, OR any money values extracted, OR if type is juridico
       const hasMoney = (values.prov > 0 || values.poss > 0 || values.jud > 0 || values.rem > 0 || values.deb > 0);
-      if (empresa || cnpj || hasMoney) {
+      const isJur = type === 'juridico' || (parsedCardData && parsedCardData.type === 'juridico');
+      const finalType = isJur ? 'juridico' : type;
+
+      if (empresa || cnpj || hasMoney || isJur) {
         parsedCardData = {
-          type,
-          empresa: empresa.toUpperCase(),
-          cnpj,
+          type: finalType,
+          empresa: empresa ? empresa.toUpperCase() : (parsedCardData ? parsedCardData.empresa : ''),
+          cnpj: cnpj || (parsedCardData ? parsedCardData.cnpj : ''),
           values
         };
+
+        const selectEl = document.getElementById('override-type-select');
+        if (selectEl) selectEl.value = finalType;
 
         // Sync header input fields
         const empresaInput = document.getElementById('override-empresa-input');
@@ -1274,10 +1280,10 @@ const logoAmandaArruda = new Image();
 
         const titleInput = document.getElementById('override-title-input');
         if (titleInput && !titleInput.value) {
-          titleInput.value = type === 'prev' ? 'Resultado Previdenciário' : 'Resultado Fiscal';
+          titleInput.value = finalType === 'prev' ? 'Resultado Previdenciário' : (finalType === 'juridico' ? 'Resultado Jurídico' : 'Resultado Fiscal');
         }
-      } else {
-        parsedCardData = null; // fallback to original print drawing
+        renderOverrideFields();
+        generateResultImage();
       }
 
       // Update Diagnostic UI (safeguarded)
