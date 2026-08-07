@@ -858,8 +858,45 @@ const logoAmandaArruda = new Image();
         previewThumbnail.style.display = 'block';
         dropZone.style.display = 'none';
         
-        // Render immediately with the pasted print!
-        generateResultImage();
+        // Instant image type detection via navy blue table header color analysis
+        const tempImg = new Image();
+        tempImg.onload = function() {
+          try {
+            const checkCanvas = document.createElement('canvas');
+            const checkCtx = checkCanvas.getContext('2d');
+            checkCanvas.width = tempImg.width;
+            checkCanvas.height = tempImg.height;
+            checkCtx.drawImage(tempImg, 0, 0);
+            
+            const imgData = checkCtx.getImageData(0, 0, tempImg.width, tempImg.height).data;
+            let navyPixels = 0;
+            const step = 6;
+            let sampleTotal = 0;
+            for (let i = 0; i < imgData.length; i += 4 * step) {
+              sampleTotal++;
+              const r = imgData[i];
+              const g = imgData[i+1];
+              const b = imgData[i+2];
+              if (r < 50 && g > 15 && g < 95 && b > 65 && b < 175) {
+                navyPixels++;
+              }
+            }
+            if (sampleTotal > 0 && (navyPixels / sampleTotal) > 0.04) {
+              console.log("⚡ Instant Jurídico image detected by navy blue header ratio:", (navyPixels / sampleTotal));
+              parsedCardData = {
+                type: 'juridico',
+                empresa: (parsedCardData && parsedCardData.empresa) || '',
+                cnpj: (parsedCardData && parsedCardData.cnpj) || '',
+                values: { deb: 0, desc: 0, ent: 0, prest: 0 }
+              };
+              const selectEl = document.getElementById('override-type-select');
+              if (selectEl) selectEl.value = 'juridico';
+            }
+          } catch(e) { console.warn("Fast image detection error:", e); }
+          
+          generateResultImage();
+        };
+        tempImg.src = e.target.result;
         
         // Trigger background OCR processing in parallel
         runBackgroundOCR(file);
@@ -1752,19 +1789,24 @@ function formatCurrency(val) {
                 gmW = targetH * gmAspect;
               }
 
-              // Position calculations based on swap option
-              let leftLogoImg = gmImg;
-              let leftLogoW = gmW;
+              // DEFAULT POSITION (swapLogos === false):
+              // Left logo: Amanda Arruda
+              // Right logo: Gmaster (far right)
+              let leftLogoImg = logoAmandaArruda;
+              let leftLogoW = aaW;
 
-              let rightLogoImg = logoAmandaArruda;
-              let rightLogoW = aaW;
+              let rightLogoImg = gmImg;
+              let rightLogoW = gmW;
 
+              // SWAPPED POSITION (swapLogos === true):
+              // Left logo: Gmaster
+              // Right logo: Amanda Arruda (far right)
               if (swapLogos) {
-                leftLogoImg = logoAmandaArruda;
-                leftLogoW = aaW;
+                leftLogoImg = gmImg;
+                leftLogoW = gmW;
 
-                rightLogoImg = gmImg;
-                rightLogoW = gmW;
+                rightLogoImg = logoAmandaArruda;
+                rightLogoW = aaW;
               }
 
               // Draw right logo
