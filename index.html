@@ -1058,6 +1058,11 @@ const logoAmandaArruda = new Image();
         type = 'juridico';
       }
 
+      // Crucial Fix: Preserve 'juridico' type if fast image detector or analyst text already established it!
+      if (parsedCardData && parsedCardData.type === 'juridico' && type === 'fiscal') {
+        type = 'juridico';
+      }
+
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       let extractedAny = false;
 
