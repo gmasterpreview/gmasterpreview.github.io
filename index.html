@@ -1976,7 +1976,7 @@ function formatCurrency(val) {
             ctx.fillText(lineObj.text.trim(), margin, currentY);
             currentY += 38;
           } else {
-            drawTextLine(ctx, lineObj.text, margin, currentY, maxTextWidth, lineObj.isLast);
+            drawTextLine(ctx, lineObj, margin, currentY, maxTextWidth);
             currentY += lineHeight;
           }
         });
