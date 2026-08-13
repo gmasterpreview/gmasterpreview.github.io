@@ -1682,15 +1682,13 @@ function formatCurrency(val) {
             }
           }
 
-          const isBullet = text.startsWith('-') || text.startsWith('•') || text.startsWith('*');
+          const m = text.match(/^([•\-]\s*|\*\s+)/);
+          const isBullet = m !== null;
           let bulletPrefix = '';
           let cleanText = text;
           if (isBullet) {
-            const m = text.match(/^([•\-\*]\s*)/);
-            if (m) {
-              bulletPrefix = m[1];
-              cleanText = text.substring(bulletPrefix.length);
-            }
+            bulletPrefix = m[1];
+            cleanText = text.substring(bulletPrefix.length);
           }
 
           const regex = /(\*\*|\*)(.*?)\1/g;
