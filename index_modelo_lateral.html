@@ -388,8 +388,16 @@
 
         <!-- Analyst Text Input -->
         <div class="form-group">
-          <label for="text-input">3. Texto do Analista</label>
-          <textarea class="text-area-analyst" id="text-input" placeholder="Cole o texto técnico gerado pelo analista aqui..." oninput="handleAnalystTextInput()"></textarea>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label for="text-input" style="margin-bottom: 0;">3. Texto do Analista</label>
+            <button type="button" id="btn-insert-bold" onclick="insertBoldInTextarea()" style="background: #1e293b; border: 1px solid #3b82f6; color: #60a5fa; font-weight: 700; font-size: 0.75rem; padding: 3px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s;" title="Inserir negrito no texto selecionado (Ctrl+B)">
+              <b>B</b> Negrito (Ctrl+B)
+            </button>
+          </div>
+          <textarea class="text-area-analyst" id="text-input" placeholder="Cole o texto técnico gerado pelo analista aqui... Use **texto** ou <b>texto</b> para deixar partes em negrito." oninput="handleAnalystTextInput()"></textarea>
+          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 4px;">
+            💡 <b>Dica de Negrito:</b> Selecione um texto e pressione <b>Ctrl+B</b> (ou <b>**texto**</b> / <b>&lt;b&gt;texto&lt;/b&gt;</b>). Títulos antes de dois pontos (ex: <i>"Risco Fiscal:"</i>) ficam em negrito automaticamente.
+          </div>
         </div>
 
         <!-- Unified Settings & Customization Accordion Section -->
@@ -1629,7 +1637,102 @@ function formatCurrency(val) {
         const cleanParagraphs = smartJoinParagraphs(cleanedBodyText);
         const fullFormattedText = cleanParagraphs.join('\n\n');
 
-        // Word-wrap the text lines for Canvas rendering
+        // Tokenize and word-wrap the text lines for Canvas rendering with full bold support
+        function tokenizeParagraphToLines(lineText) {
+          let text = lineText.replace(/<\/?(b|strong)>/gi, '**');
+
+          if (!text.includes('**') && !text.includes('*') && !text.startsWith('http')) {
+            const colonMatch = text.match(/^([A-Za-z0-9à-úÀ-Ú\s\-_•\*\.]+\s*:)(.*)/);
+            if (colonMatch) {
+              text = '**' + colonMatch[1] + '**' + colonMatch[2];
+            }
+          }
+
+          const isBullet = text.startsWith('-') || text.startsWith('•') || text.startsWith('*');
+          let bulletPrefix = '';
+          let cleanText = text;
+          if (isBullet) {
+            const m = text.match(/^([•\-\*]\s*)/);
+            if (m) {
+              bulletPrefix = m[1];
+              cleanText = text.substring(bulletPrefix.length);
+            }
+          }
+
+          const regex = /(\*\*|\*)(.*?)\1/g;
+          const runs = [];
+          let lastIdx = 0;
+          let match;
+
+          while ((match = regex.exec(cleanText)) !== null) {
+            if (match.index > lastIdx) {
+              runs.push({ text: cleanText.substring(lastIdx, match.index), isBold: false });
+            }
+            runs.push({ text: match[2], isBold: true });
+            lastIdx = regex.lastIndex;
+          }
+          if (lastIdx < cleanText.length) {
+            runs.push({ text: cleanText.substring(lastIdx), isBold: false });
+          }
+
+          const tokens = [];
+          runs.forEach(run => {
+            const parts = run.text.split(/(\s+)/);
+            parts.forEach(p => {
+              if (p.length > 0) {
+                tokens.push({ text: p, isBold: run.isBold });
+              }
+            });
+          });
+
+          const lines = [];
+          let currentTokens = [];
+          let currentLineWidth = 0;
+
+          const normalFont = '21px "Plus Jakarta Sans"';
+          const boldFont = 'bold 21px "Plus Jakarta Sans"';
+
+          ctx.font = normalFont;
+          const bulletWidth = bulletPrefix ? ctx.measureText(bulletPrefix).width : 0;
+          const indentWidth = isBullet ? ctx.measureText('  ').width : 0;
+
+          let lineAvailableWidth = maxTextWidth - (bulletPrefix ? bulletWidth : 0);
+
+          tokens.forEach(tok => {
+            const isSpace = /^\s+$/.test(tok.text);
+            ctx.font = tok.isBold ? boldFont : normalFont;
+            const w = ctx.measureText(tok.text).width;
+
+            if (currentLineWidth + w > lineAvailableWidth && currentTokens.length > 0 && !isSpace) {
+              lines.push({ 
+                tokens: currentTokens, 
+                isLast: false, 
+                isBullet: isBullet, 
+                bulletPrefix: lines.length === 0 ? bulletPrefix : '' 
+              });
+              currentTokens = [];
+              currentLineWidth = 0;
+              lineAvailableWidth = maxTextWidth - (isBullet ? indentWidth : 0);
+            }
+
+            if (currentTokens.length === 0 && isSpace) return;
+
+            currentTokens.push(tok);
+            currentLineWidth += w;
+          });
+
+          if (currentTokens.length > 0) {
+            lines.push({ 
+              tokens: currentTokens, 
+              isLast: true, 
+              isBullet: isBullet, 
+              bulletPrefix: lines.length === 0 ? bulletPrefix : '' 
+            });
+          }
+
+          return lines;
+        }
+
         const wrappedLines = [];
         const finalParagraphs = fullFormattedText.split('\n\n');
 
@@ -1639,27 +1742,8 @@ function formatCurrency(val) {
             return;
           }
 
-          const isBullet = paragraph.startsWith('-') || paragraph.startsWith('•') || paragraph.startsWith('*');
-          const bulletPrefix = isBullet ? paragraph.match(/^([•\-\*]\s*)/)[0] : '';
-          const cleanText = isBullet ? paragraph.substring(bulletPrefix.length) : paragraph;
-
-          const words = cleanText.split(' ');
-          let currentLine = bulletPrefix;
-          const paragraphLines = [];
-
-          for (let i = 0; i < words.length; i++) {
-            const testLine = currentLine + (currentLine && currentLine !== bulletPrefix ? ' ' : '') + words[i];
-            const testWidth = ctx.measureText(testLine.replace(/\*/g, '')).width;
-
-            if (testWidth > maxTextWidth && i > 0) {
-              paragraphLines.push({ text: currentLine, isLast: false, isBullet: isBullet });
-              currentLine = isBullet ? '  ' + words[i] : words[i];
-            } else {
-              currentLine = testLine;
-            }
-          }
-          paragraphLines.push({ text: currentLine, isLast: true, isBullet: isBullet });
-          wrappedLines.push(...paragraphLines);
+          const pLines = tokenizeParagraphToLines(paragraph.trim());
+          wrappedLines.push(...pLines);
           wrappedLines.push({ text: '', type: 'empty' }); // Spacing between paragraphs
         });
 
@@ -1867,110 +1951,175 @@ function formatCurrency(val) {
       }
     }
 
-    // Comprehensive Text Line drawer with word justification support
-    function drawTextLine(ctx, lineText, startX, Y, maxTextWidth, isLast) {
-      ctx.fillStyle = '#1d1d1f';
+    function insertBoldInTextarea() {
+      const textarea = document.getElementById('text-input');
+      if (!textarea) return;
       
-      const trimmed = lineText.trim();
-      if (trimmed === '') return;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      const selected = text.substring(start, end);
+      
+      let newText = '';
+      let newCursorPos = start;
 
-      const bulletMatch = lineText.match(/^([•\-\*]\s+)/);
+      if (selected.length > 0) {
+        if (selected.startsWith('**') && selected.endsWith('**')) {
+          newText = text.substring(0, start) + selected.substring(2, selected.length - 2) + text.substring(end);
+          newCursorPos = end - 4;
+        } else {
+          newText = text.substring(0, start) + '**' + selected + '**' + text.substring(end);
+          newCursorPos = end + 4;
+        }
+      } else {
+        newText = text.substring(0, start) + '**texto**' + text.substring(end);
+        newCursorPos = start + 7;
+      }
       
+      textarea.value = newText;
+      textarea.focus();
+      textarea.setSelectionRange(start === end ? start + 2 : start, newCursorPos);
+      
+      if (window.generateResultImage) {
+        window.generateResultImage();
+      }
+    }
+    window.insertBoldInTextarea = insertBoldInTextarea;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const textarea = document.getElementById('text-input');
+      if (textarea) {
+        textarea.addEventListener('keydown', (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            insertBoldInTextarea();
+          }
+        });
+      }
+    });
+
+    // Comprehensive Text Line drawer with word justification & stateful bold support
+    function drawTextLine(ctx, lineObj, startX, Y, maxTextWidth) {
+      ctx.fillStyle = '#1d1d1f';
+      const normalFont = '21px "Plus Jakarta Sans"';
+      const boldFont = 'bold 21px "Plus Jakarta Sans"';
+
       let currentStartX = startX;
       let currentMaxWidth = maxTextWidth;
-      let textToDraw = lineText;
 
-      if (bulletMatch) {
-        const bulletPrefix = bulletMatch[1];
-        ctx.font = '21px "Plus Jakarta Sans"';
-        ctx.fillText(bulletPrefix, startX, Y);
-        
-        const bulletWidth = ctx.measureText(bulletPrefix).width;
-        currentStartX = startX + bulletWidth;
-        currentMaxWidth = maxTextWidth - bulletWidth;
-        textToDraw = lineText.substring(bulletPrefix.length);
-      } else if (lineText.startsWith('  ')) {
-        ctx.font = '21px "Plus Jakarta Sans"';
-        const indentWidth = ctx.measureText('  ').width;
-        currentStartX = startX + indentWidth;
-        currentMaxWidth = maxTextWidth - indentWidth;
-        textToDraw = lineText.substring(2);
+      if (lineObj.bulletPrefix) {
+        ctx.font = normalFont;
+        ctx.fillText(lineObj.bulletPrefix, startX, Y);
+        const bW = ctx.measureText(lineObj.bulletPrefix).width;
+        currentStartX = startX + bW;
+        currentMaxWidth = maxTextWidth - bW;
+      } else if (lineObj.isBullet) {
+        ctx.font = normalFont;
+        const indW = ctx.measureText('  ').width;
+        currentStartX = startX + indW;
+        currentMaxWidth = maxTextWidth - indW;
       }
 
-      const parts = parseBoldText(textToDraw);
+      const tokens = lineObj.tokens;
+      if (!tokens || tokens.length === 0) return;
 
-      if (isLast) {
-        let currentX = currentStartX;
-        parts.forEach(part => {
-          ctx.font = part.isBold ? 'bold 21px "Plus Jakarta Sans"' : '21px "Plus Jakarta Sans"';
-          ctx.fillText(part.text, currentX, Y);
-          currentX += ctx.measureText(part.text).width;
+      if (lineObj.isLast) {
+        let x = currentStartX;
+        tokens.forEach(tok => {
+          ctx.font = tok.isBold ? boldFont : normalFont;
+          ctx.fillText(tok.text, x, Y);
+          x += ctx.measureText(tok.text).width;
         });
       } else {
-        const words = textToDraw.split(' ').filter(w => w !== '');
+        // Justified line rendering
+        const words = [];
+        let currentWordTokens = [];
+
+        tokens.forEach(tok => {
+          if (/^\s+$/.test(tok.text)) {
+            if (currentWordTokens.length > 0) {
+              words.push(currentWordTokens);
+              currentWordTokens = [];
+            }
+          } else {
+            currentWordTokens.push(tok);
+          }
+        });
+        if (currentWordTokens.length > 0) {
+          words.push(currentWordTokens);
+        }
+
         if (words.length <= 1) {
-          let currentX = currentStartX;
-          parts.forEach(part => {
-            ctx.font = part.isBold ? 'bold 21px "Plus Jakarta Sans"' : '21px "Plus Jakarta Sans"';
-            ctx.fillText(part.text, currentX, Y);
-            currentX += ctx.measureText(part.text).width;
+          let x = currentStartX;
+          tokens.forEach(tok => {
+            ctx.font = tok.isBold ? boldFont : normalFont;
+            ctx.fillText(tok.text, x, Y);
+            x += ctx.measureText(tok.text).width;
           });
           return;
         }
 
         let totalWordsWidth = 0;
-        const wordParts = words.map(word => {
-          const wParts = parseBoldText(word);
-          let wordWidth = 0;
-          wParts.forEach(p => {
-            ctx.font = p.isBold ? 'bold 21px "Plus Jakarta Sans"' : '21px "Plus Jakarta Sans"';
-            wordWidth += ctx.measureText(p.text).width;
+        const wordWidths = words.map(wToks => {
+          let w = 0;
+          wToks.forEach(tok => {
+            ctx.font = tok.isBold ? boldFont : normalFont;
+            w += ctx.measureText(tok.text).width;
           });
-          return { parts: wParts, width: wordWidth };
+          return w;
         });
 
-        wordParts.forEach(wp => {
-          totalWordsWidth += wp.width;
-        });
+        wordWidths.forEach(w => totalWordsWidth += w);
 
         const totalGaps = words.length - 1;
         const totalSpaceNeeded = currentMaxWidth - totalWordsWidth;
         const gapWidth = totalSpaceNeeded / totalGaps;
 
-        let currentX = currentStartX;
-        wordParts.forEach((wp, index) => {
-          wp.parts.forEach(part => {
-            ctx.font = part.isBold ? 'bold 21px "Plus Jakarta Sans"' : '21px "Plus Jakarta Sans"';
-            ctx.fillText(part.text, currentX, Y);
-            currentX += ctx.measureText(part.text).width;
+        let x = currentStartX;
+        words.forEach((wToks, index) => {
+          wToks.forEach(tok => {
+            ctx.font = tok.isBold ? boldFont : normalFont;
+            ctx.fillText(tok.text, x, Y);
+            x += ctx.measureText(tok.text).width;
           });
           if (index < totalGaps) {
-            currentX += gapWidth;
+            x += gapWidth;
           }
         });
       }
     }
 
-    // Markdown bold parser
+    // Markdown & Colon Label Bold Parser
     function parseBoldText(text) {
       const parts = [];
-      const regex = /\*(.*?)\*/g;
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push({ text: text.substring(lastIndex, match.index), isBold: false });
+      const markdownRegex = /(\*\*|\*)(.*?)\1/g;
+      if (markdownRegex.test(text)) {
+        markdownRegex.lastIndex = 0;
+        let lastIdx = 0;
+        let m;
+        while ((m = markdownRegex.exec(text)) !== null) {
+          if (m.index > lastIdx) {
+            parts.push({ text: text.substring(lastIdx, m.index), isBold: false });
+          }
+          parts.push({ text: m[2], isBold: true });
+          lastIdx = markdownRegex.lastIndex;
         }
-        parts.push({ text: match[1], isBold: true });
-        lastIndex = regex.lastIndex;
+        if (lastIdx < text.length) {
+          parts.push({ text: text.substring(lastIdx), isBold: false });
+        }
+        return parts;
       }
-      
-      if (lastIndex < text.length) {
-        parts.push({ text: text.substring(lastIndex), isBold: false });
+
+      const colonMatch = text.match(/^([A-Za-z0-9à-úÀ-Ú\s\-_•\*\.]+\s*:)(.*)/);
+      if (colonMatch && !text.startsWith('http')) {
+        parts.push({ text: colonMatch[1], isBold: true });
+        if (colonMatch[2]) {
+          parts.push({ text: colonMatch[2], isBold: false });
+        }
+        return parts;
       }
-      
-      return parts.length > 0 ? parts : [{ text: text, isBold: false }];
+
+      return [{ text: text, isBold: false }];
     }
 
     // Copy combined image to system clipboard
