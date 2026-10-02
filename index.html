@@ -292,11 +292,18 @@
 
     /* Palco: a imagem gerada */
     .compiled-image-box { position: absolute; inset: 0; overflow: auto; display: flex; padding: 36px; }
-    .compiled-image-preview {
-      display: none; margin: auto; max-width: 100%; max-height: 100%; object-fit: contain; background: #fff;
-      border-radius: 6px; box-shadow: var(--shadow-2);
+    .pages { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 30px; max-width: 100%; }
+    .pages-extra { display: contents; }
+    .page { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; margin: 0; }
+    .compiled-image-preview, .page-img {
+      display: none; max-width: 100%; max-height: calc(100vh - var(--appbar-h) - 72px); object-fit: contain; background: #fff;
+      border-radius: 6px; box-shadow: var(--shadow-2); cursor: zoom-in;
     }
-    .stage.zoom-real .compiled-image-preview { max-width: none; max-height: none; width: auto; }
+    .page-img { display: block; }
+    .stage.multi .compiled-image-preview, .stage.multi .page-img { max-height: none; height: auto; }
+    .stage.zoom-real .compiled-image-preview, .stage.zoom-real .page-img { max-width: none; max-height: none; width: auto; }
+    .page-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+    .page-bar-actions { display: flex; gap: 6px; }
     .no-image-placeholder { margin: auto; width: min(440px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
     .empty-art { width: 78px; height: 78px; border-radius: 22px; display: grid; place-items: center; background: var(--panel); box-shadow: var(--shadow-2); }
     .empty-art img { width: 46px; height: 46px; image-rendering: pixelated; }
@@ -529,6 +536,11 @@
               <input type="checkbox" class="switch" id="show-section-header-input" checked onchange="generateResultImage()" />
             </div>
 
+            <div class="switch-row">
+              <label class="switch-text" for="paginate-toggle-input"><strong>Dividir em páginas</strong><small>Relatório comprido vira páginas do tamanho de uma folha, sem cortar linhas nem títulos.</small></label>
+              <input type="checkbox" class="switch" id="paginate-toggle-input" checked onchange="generateResultImage()" />
+            </div>
+
             <div id="vector-override-container" style="display: none;">
               <div class="values-head"><strong>Valores dos quadros</strong><span id="values-total"></span></div>
               <div class="values-list" id="override-fields-grid"></div>
@@ -553,7 +565,13 @@
             <li><b>3</b>Clique em "Copiar imagem"</li>
           </ol>
         </div>
-        <img class="compiled-image-preview" id="compiled-image-preview" alt="Imagem unificada do resultado" onclick="viewFullscreenGenerated()" />
+        <div class="pages" id="pages">
+          <figure class="page">
+            <figcaption class="page-bar" id="page-1-bar" hidden></figcaption>
+            <img class="compiled-image-preview" id="compiled-image-preview" alt="Imagem unificada do resultado" onclick="viewFullscreenGenerated()" />
+          </figure>
+          <div class="pages-extra" id="pages-extra"></div>
+        </div>
       </div>
       <div class="stage-tools" role="group" aria-label="Tamanho da visualização">
         <button type="button" id="zoom-fit" class="is-active" onclick="setStageZoom('fit')" disabled>Ajustar à tela</button>
@@ -2219,6 +2237,10 @@ function formatCurrency(val) {
           }
         }
 
+        // Faixas que a quebra de página nunca corta: cabeçalho azul, cards redesenhados, títulos
+        const noBreakZones = [[0, imgTopPadding + 10]];
+        if (isVectorActive && !hideCards) noBreakZones.push([imgTopPadding, imgTopPadding + imgDrawHeight + 10]);
+
         // Draw the pasted printout image directly below the metadata (or vector layout)
         if (isVectorActive && !hideCards) {
           drawVectorDesign(ctx, imgMargin, imgTopPadding, imgDrawWidth, imgDrawHeight, parsedCardData);
@@ -2245,6 +2267,10 @@ function formatCurrency(val) {
             return;
           }
 
+          if (lineObj.type === 'main_header' || lineObj.type === 'company_header') {
+            // título nunca fica sozinho no fim de uma página: vai junto com a linha seguinte
+            noBreakZones.push([currentY - 34, currentY + (lineObj.type === 'main_header' ? 42 : 38) + 14]);
+          }
           if (lineObj.type === 'main_header') {
             ctx.fillStyle = '#1b4372';
             ctx.font = 'bold 24px "Plus Jakarta Sans", sans-serif';
@@ -2261,24 +2287,20 @@ function formatCurrency(val) {
           }
         });
 
-        // Export Canvas to Preview Image
-        canvas.toBlob((blob) => {
-          if (myRender !== renderSeq || !blob) return; // já existe um desenho mais novo
-          compiledBlob = blob;
-          const url = URL.createObjectURL(blob);
-          if (lastPreviewUrl) URL.revokeObjectURL(lastPreviewUrl);
-          lastPreviewUrl = url;
-          compiledImagePreview.src = url;
-          compiledImagePreview.style.display = 'block';
-          noImagePlaceholder.style.display = 'none';
-          btnCopy.disabled = false;
-          btnDownload.disabled = false;
-          document.getElementById('btn-view-fullscreen').disabled = false;
-          document.getElementById('zoom-fit').disabled = false;
-          document.getElementById('zoom-real').disabled = false;
-          const nomes = { prev: 'Previdenciário', fiscal: 'Fiscal', juridico: 'Jurídico' };
-          setStatus('ready', `${nomes[type] || 'Relatório'} · ${canvas.width} × ${canvas.height}`);
-        }, 'image/png');
+        // Exporta: uma imagem, ou várias páginas se o relatório ficou comprido
+        const pagesOn = document.getElementById('paginate-toggle-input') ? document.getElementById('paginate-toggle-input').checked : true;
+        const contTitle = overrideTitle || (type === 'prev' ? 'Resultado Previdenciário' : type === 'juridico' ? 'Resultado Jurídico' : 'Resultado Fiscal');
+        let pageCanvases;
+        try {
+          pageCanvases = pagesOn ? paginateCanvas(canvas, { noBreak: noBreakZones, band: showHeader, title: contTitle }) : [canvas];
+        } catch (e) {
+          console.warn('Quebra de páginas falhou; usando imagem única.', e);
+          pageCanvases = [canvas];
+        }
+        Promise.all(pageCanvases.map(c => new Promise(res => c.toBlob(res, 'image/png')))).then(blobs => {
+          if (myRender !== renderSeq || blobs.some(bl => !bl)) return; // já existe um desenho mais novo
+          showPages(blobs, pageCanvases, type);
+        });
       };
 
       const imageSource = uploadedImageBase64;
@@ -2338,12 +2360,193 @@ function formatCurrency(val) {
       chip.classList.toggle('is-busy', kind === 'busy');
     }
 
+    // ── Páginas ────────────────────────────────────────────────────────────
+    const PAGE_MAX_H = 1700;      // altura de uma página (proporção de uma folha A4 com 1200 de largura)
+    const SINGLE_MAX_H = 1800;    // até aqui fica numa imagem só (evita uma segunda página quase vazia)
+    const PAGE_FOOTER_H = 56;
+    const PAGE_BAND_H = 84;
+    let compiledPages = [];       // um arquivo PNG por página
+    let previewUrls = [];
+
+    // Divide a imagem alta em páginas. Só corta numa linha toda branca (entre linhas do texto, entre linhas
+    // das tabelas ou entre quadros) e fora das faixas protegidas. Se não houver linha branca (print sem
+    // espaço nenhum), corta na linha com menos tinta.
+    function paginateCanvas(full, opt) {
+      if (full.height <= SINGLE_MAX_H) return [full];
+      const W = full.width, H = full.height;
+      const data = full.getContext('2d').getImageData(0, 0, W, H).data;
+      // tinta de cada linha, calculada uma vez só (a busca do corte consulta muitas vezes)
+      const rowInk = new Int32Array(H);
+      for (let y = 0; y < H; y++) {
+        let n = 0; const base = y * W * 4;
+        for (let k = base, end = base + W * 4; k < end; k += 4) { if (data[k] < 242 || data[k + 1] < 242 || data[k + 2] < 242) n++; }
+        rowInk[y] = n;
+      }
+      const inkCount = (y) => rowInk[y];
+      const blocked = (y) => opt.noBreak.some(([a, b]) => y >= a && y < b);
+      const contTop = opt.band ? PAGE_BAND_H + 26 : 40;
+      const slices = [];
+      let start = 0, guard = 0;
+      while (start < H && guard++ < 60) {
+        const room = (slices.length === 0 ? PAGE_MAX_H : PAGE_MAX_H - contTop) - PAGE_FOOTER_H;
+        if (H - start <= room) { slices.push([start, H]); break; }
+        const limit = start + room;
+        const minCut = start + Math.floor(room * 0.45);
+        // procura, de baixo para cima, uma faixa toda branca; primeiro uma folgada (8 linhas), depois uma estreita (3)
+        const findCut = (minRun) => {
+          for (let y = limit; y > minCut; y--) {
+            if (blocked(y) || inkCount(y) !== 0) continue;
+            let topWhite = y;
+            while (topWhite - 1 > start && inkCount(topWhite - 1) === 0 && !blocked(topWhite - 1)) topWhite--;
+            if (y - topWhite + 1 >= minRun) return Math.floor((topWhite + y + 1) / 2);   // meio da faixa
+            y = topWhite;  // faixa fina demais: continua acima dela
+          }
+          return -1;
+        };
+        let cut = findCut(8);
+        if (cut < 0) cut = findCut(3);
+        if (cut < 0) {
+          let best = Infinity;
+          for (let y = limit; y > Math.max(minCut, limit - 500); y--) { if (blocked(y)) continue; const n = inkCount(y); if (n < best) { best = n; cut = y; } }
+        }
+        if (cut < 0) cut = limit;   // tudo protegido: corta no limite
+        slices.push([start, cut]);
+        // a próxima página começa logo antes do primeiro conteúdo depois do branco
+        let next = cut;
+        while (next < H && inkCount(next) === 0) next++;
+        if (next >= H) break;            // só sobrou branco: não cria página vazia
+        start = Math.max(cut, next - 6);
+      }
+      const total = slices.length;
+      if (total <= 1) return [full];
+      return slices.map(([a, b], i) => {
+        const top = i === 0 ? 0 : contTop;
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = top + (b - a) + PAGE_FOOTER_H;
+        const x = c.getContext('2d');
+        x.fillStyle = '#ffffff';
+        x.fillRect(0, 0, c.width, c.height);
+        x.drawImage(full, 0, a, W, b - a, 0, top, W, b - a);
+        if (i > 0 && opt.band) {
+          x.fillStyle = '#1b4372';
+          x.fillRect(0, 0, W, PAGE_BAND_H);
+          x.fillStyle = '#ffffff';
+          x.font = 'bold 22px "Plus Jakarta Sans", sans-serif';
+          x.textBaseline = 'middle';
+          x.fillText(fitCanvasText(x, opt.title, W - 400), 80, PAGE_BAND_H / 2);
+          x.fillStyle = '#cbd5e1';
+          x.font = '600 15px "Plus Jakarta Sans", sans-serif';
+          x.textAlign = 'right';
+          x.fillText('continuação', W - 80, PAGE_BAND_H / 2);
+          x.textAlign = 'left';
+          x.textBaseline = 'alphabetic';
+        }
+        const fy = c.height - PAGE_FOOTER_H;
+        x.strokeStyle = '#e2e8f0';
+        x.lineWidth = 1;
+        x.beginPath(); x.moveTo(80, fy + 10); x.lineTo(W - 80, fy + 10); x.stroke();
+        x.fillStyle = '#64748b';
+        x.font = '600 14px "Plus Jakarta Sans", sans-serif';
+        x.textAlign = 'center';
+        x.fillText(`Página ${i + 1} de ${total}`, W / 2, fy + 38);
+        x.textAlign = 'left';
+        return c;
+      });
+    }
+
+    function showPages(blobs, canvases, type) {
+      previewUrls.forEach(u => URL.revokeObjectURL(u));
+      previewUrls = blobs.map(bl => URL.createObjectURL(bl));
+      lastPreviewUrl = previewUrls[0];
+      compiledPages = blobs;
+      compiledBlob = blobs[0];
+      const n = blobs.length;
+      compiledImagePreview.src = previewUrls[0];
+      compiledImagePreview.style.display = 'block';
+      noImagePlaceholder.style.display = 'none';
+      document.getElementById('stage').classList.toggle('multi', n > 1);
+      const bar1 = document.getElementById('page-1-bar');
+      bar1.hidden = n < 2;
+      if (n > 1) bar1.innerHTML = pageBarHtml(0, n);
+      const extra = document.getElementById('pages-extra');
+      extra.textContent = '';
+      for (let i = 1; i < n; i++) {
+        const fig = document.createElement('figure');
+        fig.className = 'page';
+        fig.innerHTML = `<figcaption class="page-bar">${pageBarHtml(i, n)}</figcaption><img class="page-img" alt="Página ${i + 1} de ${n}">`;
+        const im = fig.querySelector('img');
+        im.src = previewUrls[i];
+        im.addEventListener('click', () => openModal(previewUrls[i]));
+        extra.appendChild(fig);
+      }
+      btnCopy.disabled = false;
+      btnDownload.disabled = false;
+      setCopyLabel(n > 1 ? 'Copiar página 1' : 'Copiar imagem');
+      btnDownload.lastChild.textContent = n > 1 ? `Baixar as ${n} páginas` : 'Baixar';
+      document.getElementById('btn-view-fullscreen').disabled = false;
+      document.getElementById('zoom-fit').disabled = false;
+      document.getElementById('zoom-real').disabled = false;
+      const nomes = { prev: 'Previdenciário', fiscal: 'Fiscal', juridico: 'Jurídico' };
+      setStatus('ready', `${nomes[type] || 'Relatório'} · ` + (n > 1 ? `${n} páginas` : `${canvases[0].width} × ${canvases[0].height}`));
+    }
+
+    function pageBarHtml(i, n) {
+      return `<span>Página ${i + 1} de ${n}</span><span class="page-bar-actions">`
+        + `<button type="button" class="btn btn-sm" onclick="copyPage(${i}, this)">Copiar</button>`
+        + `<button type="button" class="btn btn-sm" onclick="downloadPage(${i})">Baixar</button></span>`;
+    }
+
+    function setCopyLabel(text) {
+      const ico = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      btnCopy.dataset.label = ico + text;
+      if (!btnCopy.classList.contains('is-done')) btnCopy.innerHTML = ico + text;
+    }
+
+    async function copyPage(i, btn) {
+      const blob = compiledPages[i];
+      if (!blob) return;
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        if (btn) { btn.textContent = '✓ Copiada'; setTimeout(() => { btn.textContent = 'Copiar'; }, 2000); }
+      } catch (err) {
+        console.error('Falha ao copiar imagem:', err);
+        alert('Seu navegador bloqueou o acesso direto à área de transferência. Clique com o botão direito sobre a página e escolha "Copiar imagem".');
+      }
+    }
+
+    function pageFileName(i, n) {
+      const base = `Resultado_Unificado_${new Date().toISOString().slice(0, 10)}`;
+      return n > 1 ? `${base}_pagina-${i + 1}-de-${n}.png` : `${base}.png`;
+    }
+
+    function downloadPage(i) {
+      const blob = compiledPages[i];
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pageFileName(i, compiledPages.length);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
     function clearPreview() {
       compiledBlob = null;
+      compiledPages = [];
       compiledImagePreview.removeAttribute('src');
       compiledImagePreview.style.display = 'none';
       noImagePlaceholder.style.display = '';
-      if (lastPreviewUrl) { URL.revokeObjectURL(lastPreviewUrl); lastPreviewUrl = null; }
+      previewUrls.forEach(u => URL.revokeObjectURL(u));
+      previewUrls = [];
+      lastPreviewUrl = null;
+      document.getElementById('pages-extra').textContent = '';
+      document.getElementById('page-1-bar').hidden = true;
+      document.getElementById('stage').classList.remove('multi');
+      setCopyLabel('Copiar imagem');
+      btnDownload.lastChild.textContent = 'Baixar';
       btnCopy.disabled = true;
       btnDownload.disabled = true;
       document.getElementById('btn-view-fullscreen').disabled = true;
@@ -2573,7 +2776,7 @@ function formatCurrency(val) {
         await navigator.clipboard.write([item]);
 
         if (!btnCopy.dataset.label) btnCopy.dataset.label = btnCopy.innerHTML;
-        btnCopy.innerHTML = '✓ Copiada! Cole na conversa';
+        btnCopy.innerHTML = compiledPages.length > 1 ? '✓ Página 1 copiada' : '✓ Copiada! Cole na conversa';
         btnCopy.classList.add('is-done');
         clearTimeout(btnCopy._t);
         btnCopy._t = setTimeout(() => {
@@ -2588,15 +2791,9 @@ function formatCurrency(val) {
 
     // Download combined image file
     function downloadImage() {
-      if (!compiledBlob) return;
-      const url = URL.createObjectURL(compiledBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Resultado_Unificado_${new Date().toISOString().slice(0,10)}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      if (!compiledPages.length) return;
+      // uma de cada vez: o navegador pode perguntar uma vez se permite baixar vários arquivos
+      compiledPages.forEach((_, i) => setTimeout(() => downloadPage(i), i * 350));
     }
 
     function drawVectorDesign(ctx, x, y, width, height, data) {
