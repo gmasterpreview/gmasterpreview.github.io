@@ -1781,7 +1781,13 @@ function formatCurrency(val) {
                                trimmed.toUpperCase() === 'RESULTADOS - VERBAS' ||
                                trimmed.toUpperCase() === 'RESULTADOS';
 
-          const isCompanyHeader = !isMainHeader && (
+          // Título de empresa = linha CURTA (nome da empresa). Um parágrafo que apenas cita uma empresa
+          // ("...Argamassa Ltda., sob a alegação...") não pode virar título: seria desenhado em negrito,
+          // sem quebra de linha e cortado na borda da imagem.
+          ctx.font = 'bold 21px "Plus Jakarta Sans"';
+          const cabeNaLinha = ctx.measureText(trimmed).width <= maxTextWidth;
+          const pareceFrase = trimmed.length > 90 || /[.;]\s+[a-zà-ú]/.test(trimmed) || (trimmed.match(/,/g) || []).length > 1;
+          const isCompanyHeader = !isMainHeader && cabeNaLinha && !pareceFrase && (
             (trimmed === trimmed.toUpperCase() && trimmed.length > 4 && !trimmed.startsWith('•') && !trimmed.startsWith('-') && !trimmed.startsWith('*')) ||
             /\b(LTDA|S\/A|S\.A\.|ME|EPP|EIRELI)\b/i.test(trimmed)
           );
