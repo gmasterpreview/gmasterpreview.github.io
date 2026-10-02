@@ -3,7 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    // Tema antes de desenhar a página (evita piscar claro/escuro). Só a tela; a imagem gerada não muda.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('bitpreview-tema'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <title>Bit Labs · Preview</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="icon" type="image/png" href="favicon.png">
@@ -51,7 +60,54 @@
       --shadow-1: 0 1px 2px rgba(18, 20, 28, .06), 0 1px 1px rgba(18, 20, 28, .04);
       --shadow-2: 0 12px 32px -12px rgba(18, 20, 28, .22), 0 2px 6px rgba(18, 20, 28, .06);
       --appbar-h: 64px;
+      --appbar-bg: rgba(255, 255, 255, .92);
+      --panel-glass: rgba(255, 255, 255, .92);
+      --line-hover: #b9c2d5;
+      --placeholder: #a3a9b8;
+      --switch-off: #cdd3df;
+      --ok-line: #bbe5c9;
+      --danger-line: #f3b4b4;
     }
+
+    /* ── Modo escuro: só a tela. A imagem gerada continua branca, como o cliente recebe. ── */
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --app-bg: #0e1118;
+      --panel: #161a24;
+      --panel-2: #1c212d;
+      --panel-glass: rgba(22, 26, 36, .94);
+      --appbar-bg: rgba(14, 17, 24, .9);
+      --line: #262c3a;
+      --line-strong: #323a4c;
+      --line-hover: #46506a;
+      --ink: #e8ebf2;
+      --ink-2: #b4bacb;
+      --ink-3: #7d8499;
+      --placeholder: #5f667a;
+      --brand: #5c8dee;
+      --brand-600: #7aa2f5;
+      --brand-50: rgba(92, 141, 238, .14);
+      --brand-100: rgba(92, 141, 238, .32);
+      --ok: #4ade80;
+      --ok-50: rgba(74, 222, 128, .1);
+      --ok-line: rgba(74, 222, 128, .3);
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --danger-50: rgba(248, 113, 113, .1);
+      --danger-line: rgba(248, 113, 113, .35);
+      --switch-off: #3a4256;
+      --stage: #0b0d13;
+      --stage-dot: #222838;
+      --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+      --shadow-2: 0 14px 36px -12px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .4);
+    }
+    :root[data-theme="dark"] .btn-primary { color: #0b1020; }
+    :root[data-theme="dark"] .brand-logo-light { display: none; }
+    :root:not([data-theme="dark"]) .brand-logo-dark { display: none; }
+    .theme-toggle { width: 36px; padding: 0; }
+    .theme-toggle .ico-sun { display: none; }
+    :root[data-theme="dark"] .theme-toggle .ico-sun { display: block; }
+    :root[data-theme="dark"] .theme-toggle .ico-moon { display: none; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -71,7 +127,7 @@
       height: var(--appbar-h);
       display: flex; align-items: center; justify-content: space-between; gap: 16px;
       padding: 0 22px;
-      background: rgba(255, 255, 255, .92);
+      background: var(--appbar-bg);
       backdrop-filter: saturate(180%) blur(12px);
       border-bottom: 1px solid var(--line);
     }
@@ -90,7 +146,7 @@
       font-size: 12px; font-weight: 600; color: var(--ink-2); white-space: nowrap;
     }
     .status-chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
-    .status-chip.is-ready { color: var(--ok); background: var(--ok-50); border-color: #bbe5c9; }
+    .status-chip.is-ready { color: var(--ok); background: var(--ok-50); border-color: var(--ok-line); }
     .status-chip.is-ready::before { background: #22c55e; }
     .status-chip.is-busy { color: var(--brand); background: var(--brand-50); border-color: var(--brand-100); }
     .status-chip.is-busy::before { background: var(--brand); animation: pulse 1s ease-in-out infinite; }
@@ -104,7 +160,7 @@
       transition: background .15s, border-color .15s, box-shadow .15s, transform .05s;
     }
     .btn svg { width: 16px; height: 16px; flex: none; }
-    .btn:hover:not(:disabled) { border-color: #b9c2d5; background: var(--panel-2); }
+    .btn:hover:not(:disabled) { border-color: var(--line-hover); background: var(--panel-2); }
     .btn:active:not(:disabled) { transform: translateY(1px); }
     .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-100); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -115,7 +171,7 @@
     .btn-quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
     .btn-quiet:hover:not(:disabled) { background: var(--panel-2); border-color: var(--line); }
     .btn-danger-quiet { border-color: transparent; background: transparent; color: var(--danger); }
-    .btn-danger-quiet:hover:not(:disabled) { background: var(--danger-50); border-color: #f6caca; }
+    .btn-danger-quiet:hover:not(:disabled) { background: var(--danger-50); border-color: var(--danger-line); }
 
     /* Estrutura: editor à esquerda, palco à direita */
     .layout { display: grid; grid-template-columns: minmax(380px, 470px) minmax(0, 1fr); height: calc(100vh - var(--appbar-h)); }
@@ -154,6 +210,17 @@
     .print-card { display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--panel-2); }
     .preview-thumbnail { display: none; width: 100%; max-height: 150px; object-fit: contain; border-radius: 8px; background: #fff; cursor: zoom-in; }
     .print-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .print-thumbs { display: flex; flex-direction: column; gap: 6px; }
+    .print-thumb { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+    .print-thumb .pt-num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--brand-50); color: var(--brand); }
+    .print-thumb img { width: 100%; max-height: 130px; object-fit: contain; border-radius: 6px; background: #fff; cursor: zoom-in; display: block; }
+    .print-thumbs.is-multi .print-thumb img { max-height: 84px; }
+    .print-thumb .pt-actions { display: flex; flex-direction: column; gap: 2px; }
+    .pt-actions button { width: 28px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); cursor: pointer; font-size: 14px; line-height: 1; }
+    .pt-actions button:hover:not(:disabled) { background: var(--panel-2); color: var(--ink); }
+    .pt-actions button.pt-del:hover { color: var(--danger); background: var(--danger-50); }
+    .pt-actions button:disabled { opacity: .3; cursor: default; }
+    .add-print-armed { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1.5px dashed var(--brand); background: var(--brand-50); font-size: 12px; color: var(--ink-2); }
     .ocr-status-badge { display: none; font-size: 12px; font-weight: 600; color: var(--brand); padding: 6px 10px; border-radius: 8px; background: var(--brand-50); }
 
     label.field-label, .field-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
@@ -162,9 +229,9 @@
       border-radius: var(--r-sm); padding: 10px 12px; font-size: 14px; outline: none;
       transition: border-color .15s, box-shadow .15s;
     }
-    .input:hover, .text-area-analyst:hover { border-color: #b9c2d5; }
+    .input:hover, .text-area-analyst:hover { border-color: var(--line-hover); }
     .input:focus, .text-area-analyst:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-100); }
-    .input::placeholder, .text-area-analyst::placeholder { color: #a3a9b8; }
+    .input::placeholder, .text-area-analyst::placeholder { color: var(--placeholder); }
     .text-area-analyst { min-height: 200px; height: 240px; resize: vertical; line-height: 1.55; font-size: 13.5px; }
     .hint { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
     .hint b { color: var(--ink-2); }
@@ -198,7 +265,7 @@
     input.switch {
       -webkit-appearance: none; appearance: none; flex: none; cursor: pointer;
       width: 38px; height: 22px; border-radius: 999px; position: relative;
-      background: #cdd3df; transition: background .18s; outline: none;
+      background: var(--switch-off); transition: background .18s; outline: none;
     }
     input.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .18s; }
     input.switch:checked { background: var(--brand); }
@@ -236,12 +303,12 @@
     .no-image-placeholder h2 { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
     .no-image-placeholder p { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
     .empty-steps { list-style: none; display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; margin-top: 4px; }
-    .empty-steps li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.8); border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+    .empty-steps li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--panel-glass); border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
     .empty-steps li b { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--brand-50); color: var(--brand); }
     .empty-steps li.is-done { color: var(--ink-3); text-decoration: line-through; }
     .empty-steps li.is-done b { background: var(--brand); color: #fff; }
 
-    .stage-tools { position: absolute; right: 18px; bottom: 18px; z-index: 2; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,.95); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
+    .stage-tools { position: absolute; right: 18px; bottom: 18px; z-index: 2; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--panel-glass); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
     .stage-tools button { height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
     .stage-tools button.is-active { background: var(--brand-50); color: var(--brand); }
     .stage-tools button:disabled { opacity: .4; cursor: not-allowed; }
@@ -249,7 +316,7 @@
     .footer { padding: 26px 0 0; font-size: 11px; color: var(--ink-3); text-align: center; }
 
     /* Erro inesperado */
-    .error-box { display: none; position: fixed; left: 20px; bottom: 20px; z-index: 100000; width: min(440px, calc(100vw - 40px)); background: var(--panel); border: 1px solid #f3b4b4; border-left: 4px solid var(--danger); border-radius: 12px; box-shadow: var(--shadow-2); padding: 14px 16px; }
+    .error-box { display: none; position: fixed; left: 20px; bottom: 20px; z-index: 100000; width: min(440px, calc(100vw - 40px)); background: var(--panel); border: 1px solid var(--danger-line); border-left: 4px solid var(--danger); border-radius: 12px; box-shadow: var(--shadow-2); padding: 14px 16px; }
     .error-box-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; color: var(--danger); font-size: 13px; margin-bottom: 8px; }
     .error-box-head button { border: 0; background: transparent; font-size: 20px; line-height: 1; color: var(--ink-3); cursor: pointer; }
     #global-error-message { font: 12px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; }
@@ -286,7 +353,8 @@
 
   <header class="appbar">
     <div class="brand">
-      <img class="brand-logo" src="assets/bitlabs-claro.svg" alt="Bit Labs">
+      <img class="brand-logo brand-logo-light" src="assets/bitlabs-claro.svg" alt="Bit Labs">
+      <img class="brand-logo brand-logo-dark" src="assets/bitlabs-escuro.svg" alt="Bit Labs">
       <span class="brand-sep" aria-hidden="true"></span>
       <div class="brand-product">
         <strong>Preview</strong>
@@ -294,6 +362,10 @@
       </div>
     </div>
     <div class="appbar-actions">
+      <button type="button" class="btn theme-toggle" id="btn-theme" onclick="toggleTheme()" title="Alternar modo claro/escuro" aria-label="Alternar modo claro/escuro">
+        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
       <span class="status-chip" id="status-chip" role="status" aria-live="polite">Aguardando texto</span>
       <button type="button" class="btn" id="btn-view-fullscreen" onclick="viewFullscreenGenerated()" disabled title="Ver em tela cheia">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Tela cheia
@@ -329,13 +401,19 @@
               <input type="file" id="file-input" style="display: none;" accept="image/*" />
             </div>
             <div class="print-card" id="print-card" hidden>
-              <img class="preview-thumbnail" id="preview-thumbnail" alt="Print colado" onclick="openModal(this.src)" title="Clique para ampliar" />
+              <img class="preview-thumbnail" id="preview-thumbnail" alt="Print colado" hidden />
+              <div class="print-thumbs" id="print-thumbs"></div>
               <div class="ocr-status-badge" id="ocr-status-badge">⏳ Lendo dados do print: 0%</div>
-              <div class="print-actions">
-                <button type="button" class="btn btn-sm btn-quiet" onclick="openModal(document.getElementById('preview-thumbnail').src)">Ampliar</button>
-                <button type="button" class="btn btn-sm btn-quiet" onclick="document.getElementById('file-input').click()">Trocar print</button>
-                <button type="button" class="btn btn-sm btn-danger-quiet" onclick="removePrint()">Remover</button>
+              <div class="add-print-armed" id="add-print-armed" hidden>
+                <span>Dê <b>Ctrl+V</b> com o próximo quadro, ou</span>
+                <button type="button" class="btn btn-sm" onclick="document.getElementById('file-input').click()">escolha o arquivo</button>
+                <button type="button" class="btn btn-sm btn-quiet" onclick="cancelAddPrint()">Cancelar</button>
               </div>
+              <div class="print-actions">
+                <button type="button" class="btn btn-sm" id="btn-add-print" onclick="armAddPrint()">+ Adicionar quadro</button>
+                <button type="button" class="btn btn-sm btn-danger-quiet" onclick="removePrint()">Remover tudo</button>
+              </div>
+              <p class="hint" id="multi-print-hint" hidden>Os quadros entram um embaixo do outro, na mesma largura e sem as bordas brancas.</p>
             </div>
           </div>
         </section>
@@ -495,7 +573,10 @@
   </div>
 
   <script>
-    let uploadedImageBase64 = null;
+    let uploadedImageBase64 = null;   // primeiro quadro (é o que o leitor de print lê)
+    let uploadedPrints = [];          // todos os quadros colados, na ordem em que entram no relatório
+    let addingPrint = false;          // próximo print colado é um quadro a mais (não substitui)
+    const MAX_PRINTS = 4;
     let compiledBlob = null;
     let parsedCardData = null; // Holds structured values for vector redrawing
     let ocrParsedBoxValues = false; // Tracks if card box values were parsed directly from print OCR
@@ -882,6 +963,8 @@ const logoAmandaArruda = new Image();
     function removePrint() {
       ocrJob++;                       // descarta leitura em andamento
       uploadedImageBase64 = null;
+      uploadedPrints = [];
+      addingPrint = false;
       const tipoEscolhido = parsedCardData && parsedCardData.typeSource === 'user' ? parsedCardData.type : null;
       parsedCardData = null;          // os valores vinham do print
       ocrParsedBoxValues = false;
@@ -891,8 +974,109 @@ const logoAmandaArruda = new Image();
       ocrBadge.style.display = 'none';
       document.getElementById('print-card').hidden = true;
       dropZone.style.display = '';
+      renderPrintList();
       renderOverrideFields();
       generateResultImage();
+    }
+
+    // ── Vários quadros (o Jurídico passou a entregar o resultado em mais de um print) ──
+    function armAddPrint() {
+      if (uploadedPrints.length >= MAX_PRINTS) return;
+      addingPrint = true;
+      renderPrintList();
+    }
+    function cancelAddPrint() {
+      addingPrint = false;
+      renderPrintList();
+    }
+    function removePrintAt(i) {
+      if (i === 0 || uploadedPrints.length <= 1) { removePrint(); return; }
+      uploadedPrints.splice(i, 1);
+      uploadedImageBase64 = uploadedPrints[0];
+      renderPrintList();
+      generateResultImage();
+    }
+    function movePrint(i, dir) {
+      const j = i + dir;
+      if (j < 0 || j >= uploadedPrints.length) return;
+      [uploadedPrints[i], uploadedPrints[j]] = [uploadedPrints[j], uploadedPrints[i]];
+      uploadedImageBase64 = uploadedPrints[0];
+      renderPrintList();
+      generateResultImage();
+    }
+    function renderPrintList() {
+      const box = document.getElementById('print-thumbs');
+      const n = uploadedPrints.length;
+      box.textContent = '';
+      box.classList.toggle('is-multi', n > 1);
+      uploadedPrints.forEach((src, i) => {
+        const row = document.createElement('div');
+        row.className = 'print-thumb';
+        row.innerHTML = `<span class="pt-num">${i + 1}</span><img alt="Quadro ${i + 1}" title="Clique para ampliar"><div class="pt-actions">`
+          + (n > 1 ? `<button type="button" title="Subir" aria-label="Subir quadro ${i + 1}" ${i === 0 ? 'disabled' : ''} data-a="up">↑</button><button type="button" title="Descer" aria-label="Descer quadro ${i + 1}" ${i === n - 1 ? 'disabled' : ''} data-a="down">↓</button>` : '')
+          + `<button type="button" class="pt-del" title="Remover" aria-label="Remover quadro ${i + 1}" data-a="del">×</button></div>`;
+        const im = row.querySelector('img');
+        im.src = src;
+        im.addEventListener('click', () => openModal(src));
+        row.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+          if (btn.dataset.a === 'up') movePrint(i, -1);
+          else if (btn.dataset.a === 'down') movePrint(i, 1);
+          else removePrintAt(i);
+        }));
+        box.appendChild(row);
+      });
+      document.getElementById('print-card').hidden = n === 0;
+      dropZone.style.display = n === 0 ? '' : 'none';
+      document.getElementById('add-print-armed').hidden = !addingPrint;
+      const addBtn = document.getElementById('btn-add-print');
+      addBtn.hidden = addingPrint;
+      addBtn.disabled = n >= MAX_PRINTS;
+      addBtn.textContent = n >= MAX_PRINTS ? `Máximo de ${MAX_PRINTS} quadros` : '+ Adicionar quadro';
+      document.getElementById('multi-print-hint').hidden = n < 2;
+    }
+
+    // Junta vários prints num só: corta as bordas brancas e põe todos na mesma largura, um embaixo do outro
+    function trimWhite(img) {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      let d;
+      try { d = x.getImageData(0, 0, c.width, c.height).data; } catch (e) { return { src: img, sx: 0, sy: 0, sw: img.width, sh: img.height }; }
+      const W = c.width, H = c.height;
+      const ink = (px, py) => { const k = (py * W + px) * 4; return d[k + 3] > 16 && (d[k] < 236 || d[k + 1] < 236 || d[k + 2] < 236); };
+      let top = 0, bottom = H - 1, left = 0, right = W - 1;
+      const rowHas = py => { for (let px = 0; px < W; px += 2) if (ink(px, py)) return true; return false; };
+      const colHas = px => { for (let py = top; py <= bottom; py += 2) if (ink(px, py)) return true; return false; };
+      while (top < H && !rowHas(top)) top++;
+      if (top >= H) return { src: img, sx: 0, sy: 0, sw: W, sh: H };   // tudo branco: não corta
+      while (bottom > top && !rowHas(bottom)) bottom--;
+      while (left < W && !colHas(left)) left++;
+      while (right > left && !colHas(right)) right--;
+      const pad = 4;
+      const sx = Math.max(0, left - pad), sy = Math.max(0, top - pad);
+      return { src: img, sx, sy, sw: Math.min(W, right + pad + 1) - sx, sh: Math.min(H, bottom + pad + 1) - sy };
+    }
+    function composePrints(imgs) {
+      const parts = imgs.map(trimWhite);
+      const W = Math.max(...parts.map(p => p.sw));
+      const gap = Math.round(W * 0.025);
+      const heights = parts.map(p => Math.round(p.sh * W / p.sw));
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = heights.reduce((a, h) => a + h, 0) + gap * (parts.length - 1);
+      const x = c.getContext('2d');
+      x.fillStyle = '#ffffff';
+      x.fillRect(0, 0, c.width, c.height);
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      let y = 0;
+      parts.forEach((p, i) => {
+        x.drawImage(p.src, p.sx, p.sy, p.sw, p.sh, 0, y, W, heights[i]);
+        y += heights[i] + gap;
+      });
+      c.__composite = true;
+      return c;
     }
 
     function handleFile(file) {
@@ -901,13 +1085,22 @@ const logoAmandaArruda = new Image();
         return;
       }
 
+      const appending = addingPrint && uploadedPrints.length > 0 && uploadedPrints.length < MAX_PRINTS;
       const reader = new FileReader();
       reader.onload = function(e) {
+        if (appending) {
+          // quadro a mais: entra no fim, sem trocar o tipo nem ler de novo os valores
+          uploadedPrints.push(e.target.result);
+          addingPrint = false;
+          renderPrintList();
+          generateResultImage();
+          return;
+        }
+        addingPrint = false;
+        uploadedPrints = [e.target.result];
         uploadedImageBase64 = e.target.result;
         previewThumbnail.src = e.target.result;
-        previewThumbnail.style.display = 'block';
-        dropZone.style.display = 'none';
-        document.getElementById('print-card').hidden = false;
+        renderPrintList();
 
         // Instant image type detection via navy blue table header color analysis
         const tempImg = new Image();
@@ -1395,7 +1588,7 @@ const logoAmandaArruda = new Image();
       overlay.classList.remove('active');
     }
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape') { closeModal(); if (addingPrint) cancelAddPrint(); }
     });
 
     function updateModalTransform() {
@@ -1696,7 +1889,7 @@ function formatCurrency(val) {
 
         // Check if Gmaster header banner and auto-crop should be included
         const showHeader = document.getElementById('header-toggle-input') ? document.getElementById('header-toggle-input').checked : true;
-        const autoCrop = (img && type !== 'juridico') ? (document.getElementById('crop-toggle-input') ? document.getElementById('crop-toggle-input').checked : false) : false;
+        const autoCrop = (img && !img.__composite && type !== 'juridico') ? (document.getElementById('crop-toggle-input') ? document.getElementById('crop-toggle-input').checked : false) : false;
 
         // Calculate crop offset from original image if header and crop are enabled
         const cropTopY = (img && showHeader && autoCrop) ? Math.floor(img.width * (228 / 1200)) : 0;
@@ -2089,9 +2282,17 @@ function formatCurrency(val) {
       };
 
       const imageSource = uploadedImageBase64;
+      const allSources = uploadedPrints.length > 1 ? uploadedPrints.slice() : null;
       reportFontsReady.then(() => {
         if (myRender !== renderSeq) return;
-        if (imageSource) {
+        if (allSources) {
+          Promise.all(allSources.map(src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; })))
+            .then(imgs => {
+              if (myRender !== renderSeq) return;
+              const ok = imgs.filter(Boolean);
+              executeRenderCanvas(ok.length > 1 ? composePrints(ok) : (ok[0] || null));
+            });
+        } else if (imageSource) {
           const img = new Image();
           img.onload = function() {
             if (myRender !== renderSeq) return;
@@ -2151,6 +2352,13 @@ function formatCurrency(val) {
       setStatus('idle', 'Aguardando texto');
     }
 
+    // Modo claro/escuro da tela (a imagem gerada não muda). Fica guardado neste navegador.
+    function toggleTheme() {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('bitpreview-tema', next); } catch (e) {}
+    }
+
     function setStageZoom(mode) {
       document.getElementById('stage').classList.toggle('zoom-real', mode === 'real');
       document.getElementById('zoom-fit').classList.toggle('is-active', mode !== 'real');
@@ -2172,7 +2380,7 @@ function formatCurrency(val) {
       };
       setRow('row-logo', 'logo-toggle-input', header);
       setRow('row-swap', 'swap-logos-input', header && type === 'juridico');
-      setRow('crop-toggle-container', 'crop-toggle-input', header && hasPrint && type !== 'juridico' && !hideCards);
+      setRow('crop-toggle-container', 'crop-toggle-input', header && hasPrint && uploadedPrints.length < 2 && type !== 'juridico' && !hideCards);
       setRow('row-vector', 'vector-toggle-input', type !== 'juridico' && !hideCards);
       syncTypeUI();
 
